@@ -34,6 +34,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <time.h>
+#include <uint40.hpp>
 
 #define maxval(a,b) ((a) > (b) ? (a) : (b))
 
