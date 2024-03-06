@@ -49,6 +49,7 @@
 #if M64
 	typedef int64_t	int_t;
 	typedef uint64_t uint_t;
+	typedef uint40 array_uint_t;
 	#define PRIdN	PRId64
 	#define U_MAX	UINT64_MAX
 	#define I_MAX	INT64_MAX
@@ -56,6 +57,7 @@
 #else
 	typedef int32_t int_t;
 	typedef uint32_t uint_t;
+	typedef uint32_t array_uint_t;
 	#define PRIdN	PRId32
 	#define U_MAX	UINT32_MAX
 	#define I_MAX	INT32_MAX
@@ -82,13 +84,13 @@ typedef uint_t int_da;
  *  @param n	string length
  *  @return -1 if an error occured, otherwise the depth of the recursive calls.
  */
-int sacak(unsigned char *s, uint_t *SA, uint_t n);
+int sacak(unsigned char *s, array_uint_t *SA, uint_t n);
 
 /** @brief computes the suffix array of string s[0..n-1]
  *
  *  @param k	alphabet size+1 (0 is reserved)
  */
-int sacak_int(int_text *s, uint_t *SA, uint_t n, uint_t k);
+int sacak_int(int_text *s, array_uint_t *SA, uint_t n, uint_t k);
 
 /******************************************************************************/
 
@@ -102,7 +104,7 @@ int sacak_int(int_text *s, uint_t *SA, uint_t n, uint_t k);
  *  
  *  @return depth of the recursive calls.
  */
-int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n);
+int gsacak(unsigned char *s, array_uint_t *SA, int_t *LCP, int_da *DA, uint_t n);
 
 /** @brief Computes the suffix array SA (LCP, DA) of T^cat in s[0..n-1]
  *
@@ -115,7 +117,7 @@ int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n);
  *
  *  @return depth of the recursive calls.
  */
-int gsacak_int(int_text *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n, uint_t k);
+int gsacak_int(int_text *s, array_uint_t *SA, int_t *LCP, int_da *DA, uint_t n, uint_t k);
 
 /******************************************************************************/
 

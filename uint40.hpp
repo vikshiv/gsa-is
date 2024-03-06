@@ -56,18 +56,29 @@ class uint40 {
 
     inline operator uint64_t() const {
       return (((std::uint64_t)high) << 32) | (std::uint64_t)low;  }
+
+
     inline bool operator == (const uint40& b) const {
-      return (low == b.low) && (high == b.high); }
+      return (low == b.low) && (high == b.high); }  
     inline bool operator != (const uint40& b) const {
       return (low != b.low) || (high != b.high); }
+
     inline bool operator > (const uint40& b) const {
       return (high > b.high) || ((high == b.high) && (low > b.low)); }
     inline bool operator < (const uint40& b) const {
       return (high < b.high) || ((high == b.high) && (low < b.low)); }
-    inline bool operator + (const uint40& b) const {
-      return uint40(uint64_t(this) + uint64_t(b)); }
-    inline bool operator - (const uint40& b) const {
-      return uint40(uint64_t(this) - uint64_t(b)); }
+
+    inline bool operator > (const uint64_t& b) const {
+      return (high > ((b >> 32) & 0xFF)) || ((high == ((b >> 32) & 0xFF)) && (low > (b & 0xFFFFFFFFL))); }
+    inline bool operator < (const uint64_t& b) const {
+      return (high < ((b >> 32) & 0xFF)) || ((high == ((b >> 32) & 0xFF)) && (low > (b & 0xFFFFFFFFL))); }
+
+    inline bool operator != (const uint64_t& b) const {
+      return (low != (b & 0xFFFFFFFFL)) || (high != ((b >> 32) & 0xFF)); }
+    inline bool operator == (const uint64_t& b) const {
+      return (low == (b & 0xFFFFFFFFL)) && (high == ((b >> 32) & 0xFF)); }
+
+
 } __attribute__((packed));
 
 namespace std {

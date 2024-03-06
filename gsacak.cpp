@@ -1,6 +1,6 @@
 // vim: noai:ts=2:sw=2
 
-#include "gsacak.h"
+#include "gsacak.hpp"
 
 // set only the highest bit as 1, i.e. 1000...
 //const unsigned int EMPTY_k=((unsigned int)1)<<(sizeof(unsigned int)*8-1); 
@@ -41,8 +41,8 @@ void stack_push_k(t_pair_k* STACK, int_t *top, uint_t idx, int_t lcp){
   (*top)++;
 }
 
-void compute_lcp_phi_sparse(int_t *s, uint_t *SA1, 
-  uint_t *RA, int_t *LCP, int_t *PLCP,
+void compute_lcp_phi_sparse(int_t *s, array_uint_t *SA1, 
+  array_uint_t *RA, int_t *LCP, int_t *PLCP,
   uint_t n1, int cs, uint_t separator) {
 
   uint_t i;
@@ -94,7 +94,7 @@ void getBuckets_k(int_t *s,
 
 /*****************************************************************************/
 
-void putSuffix0(uint_t *SA, 
+void putSuffix0(array_uint_t *SA, 
   int_t *s, uint_t *bkt, 
   uint_t n, unsigned int K, int_t n1, int cs) {
   uint_t i, j;
@@ -110,7 +110,7 @@ void putSuffix0(uint_t *SA,
   SA[0]=n-1; // set the single sentinel suffix.
 }
 
-void putSuffix0_generalized(uint_t *SA, 
+void putSuffix0_generalized(array_uint_t *SA, 
   uint_t *s, uint_t *bkt, 
   uint_t n, unsigned int K, int_t n1, int cs, uint_t separator) {
   uint_t i, j;
@@ -132,7 +132,7 @@ void putSuffix0_generalized(uint_t *SA,
 
 }
 
-void putSuffix0_generalized_LCP(uint_t *SA, int_t *LCP,
+void putSuffix0_generalized_LCP(array_uint_t *SA, int_t *LCP,
   uint_t *s, uint_t *bkt, 
   uint_t n, unsigned int K, int_t n1, int cs, uint_t separator) {
   uint_t i, j;
@@ -158,7 +158,7 @@ void putSuffix0_generalized_LCP(uint_t *SA, int_t *LCP,
 
 }
 
-void putSuffix0_generalized_DA(uint_t *SA, int_da *DA,
+void putSuffix0_generalized_DA(array_uint_t *SA, int_da *DA,
   uint_t *s, uint_t *bkt, 
   uint_t n, unsigned int K, int_t n1, int cs, uint_t separator) {
   uint_t i, j;
@@ -183,7 +183,7 @@ void putSuffix0_generalized_DA(uint_t *SA, int_da *DA,
 }
 
 
-void putSuffix0_generalized_LCP_DA(uint_t *SA, int_t *LCP,  int_da *DA, 
+void putSuffix0_generalized_LCP_DA(array_uint_t *SA, int_t *LCP,  int_da *DA, 
   uint_t *s, uint_t *bkt, 
   uint_t n, unsigned int K, int_t n1, int cs, uint_t separator) {
   uint_t i, j;
@@ -212,7 +212,7 @@ void putSuffix0_generalized_LCP_DA(uint_t *SA, int_t *LCP,  int_da *DA,
 
 /*****************************************************************************/
 
-void induceSAl0(uint_t *SA,
+void induceSAl0(array_uint_t *SA,
   int_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int_t suffix, int cs) {
   uint_t i, j;
@@ -232,7 +232,7 @@ void induceSAl0(uint_t *SA,
     }
 }
 
-void induceSAs0(uint_t *SA,
+void induceSAs0(array_uint_t *SA,
   int_t	*s, uint_t *bkt,
   uint_t n, unsigned int K, int_t suffix, int cs) {
   uint_t i, j;
@@ -252,7 +252,7 @@ void induceSAs0(uint_t *SA,
 }
 /*****************************************************************************/
 
-void induceSAl0_generalized(uint_t *SA,
+void induceSAl0_generalized(array_uint_t *SA,
   uint_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int_t suffix, int cs, uint_t separator) {
   uint_t i, j;
@@ -272,7 +272,7 @@ void induceSAl0_generalized(uint_t *SA,
     }
 }
 
-void induceSAs0_generalized(uint_t *SA,
+void induceSAs0_generalized(array_uint_t *SA,
   uint_t *s, uint_t *bkt,
   uint_t n, uint_t K, int_t suffix, int cs, uint_t separator) {
   uint_t i, j;
@@ -293,7 +293,7 @@ void induceSAs0_generalized(uint_t *SA,
 
 /*****************************************************************************/
 
-void induceSAl0_generalized_LCP(uint_t *SA, int_t *LCP,
+void induceSAl0_generalized_LCP(array_uint_t *SA, int_t *LCP,
   uint_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int cs, uint_t separator) {
   uint_t i, j;
@@ -430,7 +430,7 @@ void induceSAl0_generalized_LCP(uint_t *SA, int_t *LCP,
 
 }
 
-void induceSAs0_generalized_LCP(uint_t *SA, int_t* LCP,
+void induceSAs0_generalized_LCP(array_uint_t *SA, int_t* LCP,
   uint_t *s, uint_t *bkt,
   uint_t n, uint_t K, int cs, uint_t separator) {
   uint_t i, j;
@@ -548,7 +548,7 @@ void induceSAs0_generalized_LCP(uint_t *SA, int_t* LCP,
 
 /*****************************************************************************/
 
-void induceSAl0_generalized_DA(uint_t *SA, int_da* DA,
+void induceSAl0_generalized_DA(array_uint_t *SA, int_da* DA,
   uint_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int cs, uint_t separator) {
   uint_t i, j;
@@ -569,7 +569,7 @@ void induceSAl0_generalized_DA(uint_t *SA, int_da* DA,
     }
 }
 
-void induceSAs0_generalized_DA(uint_t *SA, int_da* DA,
+void induceSAs0_generalized_DA(array_uint_t *SA, int_da* DA,
   uint_t *s, uint_t *bkt,
   uint_t n, uint_t K, int cs, uint_t separator) {
   uint_t i, j;
@@ -591,7 +591,7 @@ void induceSAs0_generalized_DA(uint_t *SA, int_da* DA,
 
 /*****************************************************************************/
 
-void induceSAl0_generalized_LCP_DA(uint_t *SA, int_t *LCP, int_da *DA,
+void induceSAl0_generalized_LCP_DA(array_uint_t *SA, int_t *LCP, int_da *DA,
   uint_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int cs, uint_t separator) {
   uint_t i, j;
@@ -728,7 +728,7 @@ void induceSAl0_generalized_LCP_DA(uint_t *SA, int_t *LCP, int_da *DA,
 
 }
 
-void induceSAs0_generalized_LCP_DA(uint_t *SA, int_t* LCP, int_da* DA,
+void induceSAs0_generalized_LCP_DA(array_uint_t *SA, int_t* LCP, int_da* DA,
   uint_t *s, uint_t *bkt,
   uint_t n, uint_t K, int cs, uint_t separator) {
   uint_t i, j;
@@ -848,7 +848,7 @@ void induceSAs0_generalized_LCP_DA(uint_t *SA, int_t* LCP, int_da* DA,
 /*****************************************************************************/
 
 
-void putSubstr0(uint_t *SA,
+void putSubstr0(array_uint_t *SA,
   int_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int cs) {
   uint_t i, cur_t, succ_t;
@@ -873,7 +873,7 @@ void putSubstr0(uint_t *SA,
 }
 
 /*****************************************************************************/
-void putSubstr0_generalized(uint_t *SA,
+void putSubstr0_generalized(array_uint_t *SA,
   uint_t *s, uint_t *bkt,
   uint_t n, unsigned int K, int cs, uint_t separator) {
   uint_t i, cur_t, succ_t;
@@ -1161,8 +1161,8 @@ uint_t getLengthOfLMS(int_t	*s,
   return dist+1;
 }
 
-uint_t nameSubstr(uint_t *SA, 
-  int_t *s, uint_t *s1, uint_t n, 
+uint_t nameSubstr(array_uint_t *SA, 
+  int_t *s, array_uint_t *s1, uint_t n, 
   uint_t m, uint_t n1, int level, int cs) {
   uint_t i, j, cur_t, succ_t;
 
@@ -1192,7 +1192,7 @@ uint_t nameSubstr(uint_t *SA,
       pre_pos=pos; pre_len=len;
     }
     else
-      SA[name]++; // count this name.
+      SA[name] = SA[name] + 1; // count this name.
 
     SA[n1+pos/2]=name;
   }
@@ -1210,7 +1210,7 @@ uint_t nameSubstr(uint_t *SA,
     int_t ch=s1[i], ch1=s1[i-1];
     cur_t=(ch1< ch || (ch1==ch && succ_t==1))?1:0;
     if(cur_t==1) {
-      s1[i-1]+=SA[s1[i-1]]-1;
+      s1[i-1] = s1[i-1] + SA[s1[i-1]]-1;
     }
     succ_t=cur_t;
   }
@@ -1220,8 +1220,8 @@ uint_t nameSubstr(uint_t *SA,
 
 /*****************************************************************************/
 
-uint_t nameSubstr_generalized(uint_t *SA, 
-  uint_t *s, uint_t *s1, uint_t n, 
+uint_t nameSubstr_generalized(array_uint_t *SA, 
+  uint_t *s, array_uint_t *s1, uint_t n, 
   uint_t m, uint_t n1, int level, int cs, uint_t separator) {
   uint_t i, j, cur_t, succ_t;
 
@@ -1252,7 +1252,7 @@ uint_t nameSubstr_generalized(uint_t *SA,
       pre_pos=pos; pre_len=len;
     }
     else
-      SA[name]++; // count this name.
+      SA[name] = SA[name] + 1; // count this name.
 
     SA[n1+pos/2]=name;
   }
@@ -1270,7 +1270,7 @@ uint_t nameSubstr_generalized(uint_t *SA,
     int_t ch=s1[i], ch1=s1[i-1];
     cur_t=(ch1< ch || (ch1==ch && succ_t==1))?1:0;
     if(cur_t==1) {
-      s1[i-1]+=SA[s1[i-1]]-1;
+      s1[i-1] = s1[i-1] + SA[s1[i-1]]-1;
     }
     succ_t=cur_t;
   }
@@ -1280,8 +1280,8 @@ uint_t nameSubstr_generalized(uint_t *SA,
 
 /*****************************************************************************/
 
-uint_t nameSubstr_generalized_LCP(uint_t *SA, int_t *LCP,
-  uint_t *s, uint_t *s1, uint_t n, 
+uint_t nameSubstr_generalized_LCP(array_uint_t *SA, int_t *LCP,
+  uint_t *s, array_uint_t *s1, uint_t n, 
   uint_t m, uint_t n1, int level, int cs, uint_t separator) {
   uint_t i, j, cur_t, succ_t;
 
@@ -1315,7 +1315,7 @@ uint_t nameSubstr_generalized_LCP(uint_t *SA, int_t *LCP,
       pre_pos=pos; pre_len=len;
     }
     else
-      SA[name]++; // count this name.
+      SA[name] = SA[name] + 1; // count this name.
 
     SA[n1+pos/2]=name;
   }
@@ -1333,7 +1333,7 @@ uint_t nameSubstr_generalized_LCP(uint_t *SA, int_t *LCP,
     int_t ch=s1[i], ch1=s1[i-1];
     cur_t=(ch1< ch || (ch1==ch && succ_t==1))?1:0;
     if(cur_t==1) {
-      s1[i-1]+=SA[s1[i-1]]-1;
+      s1[i-1] = s1[i-1] + SA[s1[i-1]]-1;
     }
     succ_t=cur_t;
   }
@@ -1343,9 +1343,9 @@ uint_t nameSubstr_generalized_LCP(uint_t *SA, int_t *LCP,
 
 /*****************************************************************************/
 
-void getSAlms(uint_t *SA, 
+void getSAlms(array_uint_t *SA, 
   int_t *s, 
-  uint_t *s1, uint_t n, 
+  array_uint_t *s1, uint_t n, 
   uint_t n1, int level, int cs) {
   uint_t i, j, cur_t, succ_t;
 
@@ -1360,9 +1360,9 @@ void getSAlms(uint_t *SA,
 }
 
 
-void getSAlms_DA(uint_t *SA, int_da* DA,
+void getSAlms_DA(array_uint_t *SA, int_da* DA,
   int_t *s, 
-  uint_t *s1, uint_t n, 
+  array_uint_t *s1, uint_t n, 
   uint_t n1, int level, int cs, uint_t separator) {
   uint_t i, j, cur_t, succ_t;
 
@@ -1393,7 +1393,7 @@ void getSAlms_DA(uint_t *SA, int_da* DA,
 
 /*****************************************************************************/
 
-int_t SACA_K(int_t	*s, uint_t *SA,
+int_t SACA_K(int_t	*s, array_uint_t *SA,
   uint_t n, unsigned int K,
   uint_t m, int cs, int level) {
   uint_t i;
@@ -1443,7 +1443,7 @@ int_t SACA_K(int_t	*s, uint_t *SA,
     if((!level&&SA[i]>0) || (level&&((int_t *)SA)[i]>0))
       SA[n1++]=SA[i];
 
-  uint_t *SA1=SA, *s1=SA+m-n1;
+  array_uint_t *SA1=SA, *s1=SA+m-n1;
   uint_t name_ctr;
   name_ctr=nameSubstr(SA,s,s1,n,m,n1,level,cs);
 
@@ -1526,7 +1526,7 @@ return depth;
 
 /*****************************************************************************/
 
-int_t gSACA_K(uint_t *s, uint_t *SA,
+int_t gSACA_K(uint_t *s, array_uint_t *SA,
   uint_t n, unsigned int K,
   int cs, uint_t separator, int level) {
   uint_t i;
@@ -1572,7 +1572,7 @@ int_t gSACA_K(uint_t *s, uint_t *SA,
     if((SA[i]>0))
       SA[n1++]=SA[i];
 
-  uint_t *SA1=SA, *s1=SA+m-n1;
+  array_uint_t *SA1=SA, *s1=SA+m-n1;
   uint_t name_ctr;
   name_ctr=nameSubstr_generalized(SA,s,s1,n,m,n1,level,cs,separator);
 
@@ -1645,7 +1645,7 @@ return depth;
 
 /*****************************************************************************/
 
-int_t gSACA_K_LCP(uint_t *s, uint_t *SA, int_t *LCP,
+int_t gSACA_K_LCP(uint_t *s, array_uint_t *SA, int_t *LCP,
   uint_t n, unsigned int K,
   int cs, uint_t separator, int level) {
   uint_t i;
@@ -1723,7 +1723,7 @@ int_t gSACA_K_LCP(uint_t *s, uint_t *SA, int_t *LCP,
     if((SA[i]>0))
       SA[n1++]=SA[i];
 
-  uint_t *SA1=SA, *s1=SA+m-n1;
+  array_uint_t *SA1=SA, *s1=SA+m-n1;
   uint_t name_ctr;
 
   #if DEBUG
@@ -1797,7 +1797,7 @@ int_t gSACA_K_LCP(uint_t *s, uint_t *SA, int_t *LCP,
   printf("\n\n");
   #endif
 
-  uint_t *RA=s1;
+  array_uint_t *RA=s1;
   int_t *PLCP=LCP+m-n1;//PHI is stored in PLCP array
 
   //compute the LCP of consecutive LMS-suffixes
@@ -1929,7 +1929,7 @@ return depth;
 
 /*****************************************************************************/
 
-int_t gSACA_K_DA(uint_t *s, uint_t *SA, int_da *DA,
+int_t gSACA_K_DA(uint_t *s, array_uint_t *SA, int_da *DA,
   uint_t n, unsigned int K,
   int cs, uint_t separator, int level) {
   uint_t i;
@@ -2007,7 +2007,7 @@ int_t gSACA_K_DA(uint_t *s, uint_t *SA, int_da *DA,
     if((SA[i]>0))
       SA[n1++]=SA[i];
 
-  uint_t *SA1=SA, *s1=SA+m-n1;
+  array_uint_t *SA1=SA, *s1=SA+m-n1;
   uint_t name_ctr;
 
   #if DEBUG
@@ -2182,7 +2182,7 @@ return depth;
 
 /*****************************************************************************/
 
-int_t gSACA_K_LCP_DA(uint_t *s, uint_t *SA, int_t *LCP, int_da *DA,
+int_t gSACA_K_LCP_DA(uint_t *s, array_uint_t *SA, int_t *LCP, int_da *DA,
   uint_t n, unsigned int K,
   int cs, uint_t separator, int level) {
   uint_t i;
@@ -2260,7 +2260,7 @@ int_t gSACA_K_LCP_DA(uint_t *s, uint_t *SA, int_t *LCP, int_da *DA,
     if((SA[i]>0))
       SA[n1++]=SA[i];
 
-  uint_t *SA1=SA, *s1=SA+m-n1;
+  array_uint_t *SA1=SA, *s1=SA+m-n1;
   uint_t name_ctr;
 
   #if DEBUG
@@ -2343,7 +2343,7 @@ int_t gSACA_K_LCP_DA(uint_t *s, uint_t *SA, int_t *LCP, int_da *DA,
   printf("\n\n");
   #endif
 
-  uint_t *RA=s1;
+  array_uint_t *RA=s1;
   int_t *PLCP=LCP+m-n1;//PHI is stored in PLCP array
 
   //compute the LCP of consecutive LMS-suffixes
@@ -2490,17 +2490,17 @@ return depth;
 /*****************************************************************************/
 
 
-int sacak(unsigned char *s, uint_t *SA, uint_t n){
+int sacak(unsigned char *s, array_uint_t *SA, uint_t n){
 	if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
-	return SACA_K((int_t*)s, (uint_t*)SA, n, 256, n, sizeof(char), 0);
+	return SACA_K((int_t*)s, (array_uint_t*)SA, n, 256, n, sizeof(char), 0);
 }
 
-int sacak_int(int_text *s, uint_t *SA, uint_t n, uint_t k){
+int sacak_int(int_text *s, array_uint_t *SA, uint_t n, uint_t k){
 	if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
-	return SACA_K((int_t*)s, (uint_t*)SA, n, k, n, sizeof(int_text), 0);
+	return SACA_K((int_t*)s, (array_uint_t*)SA, n, k, n, sizeof(int_text), 0);
 }
 
-int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n){
+int gsacak(unsigned char *s, array_uint_t *SA, int_t *LCP, int_da *DA, uint_t n){
 
 	if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
 	int_t i;
@@ -2522,7 +2522,7 @@ int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n){
 		return gSACA_K_LCP_DA((uint_t*)s, SA, LCP, DA, n, 256, sizeof(char), 1, 0);
 }
 
-int gsacak_int(int_text *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n, uint_t k){
+int gsacak_int(int_text *s, array_uint_t *SA, int_t *LCP, int_da *DA, uint_t n, uint_t k){
 
 	if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
 	int_t i;
