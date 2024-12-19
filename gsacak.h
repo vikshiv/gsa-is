@@ -47,16 +47,16 @@
 
 #if M64
 	typedef int64_t	int_t;
-	typedef uint64_t uint_t;
+	typedef uint40 uint_t;
 	#define PRIdN	PRId64
-	#define U_MAX	UINT64_MAX
+	#define U_MAX	uint40((1ULL << 40) - 1)
 	#define I_MAX	INT64_MAX
 	#define I_MIN	INT64_MIN
 #else
 	typedef int32_t int_t;
-	typedef uint32_t uint_t;
+	typedef uint40 uint_t;
 	#define PRIdN	PRId32
-	#define U_MAX	UINT32_MAX
+	#define U_MAX	uint40((1ULL << 40) - 1)
 	#define I_MAX	INT32_MAX
 	#define I_MIN	INT32_MIN
 #endif
@@ -81,13 +81,13 @@ typedef uint_t int_da;
  *  @param n	string length
  *  @return -1 if an error occured, otherwise the depth of the recursive calls.
  */
-int sacak(unsigned char *s, uint_t *SA, uint_t n);
+int sacak(unsigned char *s, uint40 *SA, uint64_t n);
 
 /** @brief computes the suffix array of string s[0..n-1]
  *
  *  @param k	alphabet size+1 (0 is reserved)
  */
-int sacak_int(int_text *s, uint_t *SA, uint_t n, uint_t k);
+int sacak_int(int_text *s, uint40 *SA, uint64_t n, uint64_t k);
 
 /******************************************************************************/
 
@@ -101,7 +101,7 @@ int sacak_int(int_text *s, uint_t *SA, uint_t n, uint_t k);
  *  
  *  @return depth of the recursive calls.
  */
-int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n);
+int gsacak(unsigned char *s, uint40 *SA, int_t *LCP, int_da *DA, uint64_t n);
 
 /** @brief Computes the suffix array SA (LCP, DA) of T^cat in s[0..n-1]
  *
@@ -114,8 +114,115 @@ int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n);
  *
  *  @return depth of the recursive calls.
  */
-int gsacak_int(int_text *s, uint_t *SA, int_t *LCP, int_da *DA, uint_t n, uint_t k);
+int gsacak_int(int_text *s, uint40 *SA, int_t *LCP, int_da *DA, uint64_t n, uint64_t k);
 
 /******************************************************************************/
+
+class uint40 {
+private:
+    uint32_t low;
+    uint8_t high;
+
+public:
+    uint40() : low(0), high(0) {}
+    
+    uint40(uint64_t val) {
+        low = val & 0xFFFFFFFF;
+        high = (val >> 32) & 0xFF;
+    }
+
+    operator uint64_t() const {
+        return ((uint64_t)high << 32) | low;
+    }
+
+    // Comparison operators
+    bool operator<(const uint40& other) const {
+        if (high != other.high)
+            return high < other.high;
+        return low < other.low;
+    }
+    bool operator>(const uint40& other) const {
+        if (high != other.high)
+            return high > other.high;
+        return low > other.low;
+    }
+    bool operator<=(const uint40& other) const {
+        if (high != other.high)
+            return high < other.high;
+        return low <= other.low;
+    }
+    bool operator>=(const uint40& other) const {
+        if (high != other.high)
+            return high > other.high;
+        return low >= other.low;
+    }
+    bool operator==(const uint40& other) const {
+        return high == other.high && low == other.low;
+    }
+    bool operator!=(const uint40& other) const {
+        return high != other.high || low != other.low;
+    }
+
+    // Assignment operators
+    uint40& operator=(const uint40& other) {
+        if (this != &other) {
+            low = other.low;
+            high = other.high;
+        }
+        return *this;
+    }
+    uint40& operator=(uint64_t val) {
+        low = val & 0xFFFFFFFF;
+        high = (val >> 32) & 0xFF;
+        return *this;
+    }
+
+    // Arithmetic operators
+    uint40 operator+(const uint40& other) const {
+        uint64_t sum = (uint64_t)*this + (uint64_t)other;
+        return uint40(sum);
+    }
+    uint40 operator-(const uint40& other) const {
+        uint64_t diff = (uint64_t)*this - (uint64_t)other;
+        return uint40(diff);
+    }
+    uint40& operator++() {
+        if (low == 0xFFFFFFFF) {
+            low = 0;
+            high++;
+        } else {
+            low++;
+        }
+        return *this;
+    }
+    uint40 operator++(int) {
+        uint40 temp = *this;
+        ++*this;
+        return temp;
+    }
+    uint40& operator--() {
+        if (low == 0) {
+            low = 0xFFFFFFFF;
+            high--;
+        } else {
+            low--;
+        }
+        return *this;
+    }
+    uint40 operator--(int) {
+        uint40 temp = *this;
+        --*this;
+        return temp;
+    }
+};
+
+// Add constants for uint40
+const uint40 U_MAX = uint40((1ULL << 40) - 1);
+const uint40 EMPTY_k = uint40(1ULL << 39);
+
+void getBuckets_k(int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int end, int cs);
+void putSuffix0(uint40 *SA, int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int64_t n1, int cs);
+void induceSAl0(uint40 *SA, int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int_t suffix, int cs);
+void induceSAs0(uint40 *SA, int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int_t suffix, int cs);
 
 #endif
