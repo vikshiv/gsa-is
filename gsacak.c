@@ -3,8 +3,7 @@
 #include "gsacak.h"
 
 // set only the highest bit as 1, i.e. 1000...
-//const unsigned int EMPTY_k=((unsigned int)1)<<(sizeof(unsigned int)*8-1); 
-const uint_t EMPTY_k=((uint_t)1)<<(sizeof(uint_t)*8-1); 
+const uint_t EMPTY_k = uint40_from_u64(UINT40_EMPTY);
 
 // get s[i] at a certain level
 #define chr(i) (cs==sizeof(int_t)?((int_t*)s)[i]:(cs==sizeof(int_text)?((int_text*)s)[i]:((unsigned char *)s)[i]))
@@ -28,11 +27,11 @@ typedef struct _pair{
 } t_pair_k;
 
 int compare_k(const void *a, const void *b) {
-  const uint40 *x = (const uint40 *)a;
-  const uint40 *y = (const uint40 *)b;
-  if(*x < *y) return -1;
-  if(*x > *y) return 1;
-  return 0;
+    const uint_t *x = (const uint_t *)a;
+    const uint_t *y = (const uint_t *)b;
+    if(uint40_lt(*x, *y)) return -1;
+    if(uint40_gt(*x, *y)) return 1;
+    return 0;
 }
 
 void stack_push_k(t_pair_k* STACK, int_t *top, uint_t idx, int_t lcp){
@@ -76,152 +75,427 @@ void compute_lcp_phi_sparse(int_t *s, uint40 *SA1,
 
 /*****************************************************************************/
 
-void getBuckets_k(int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int end, int cs) { 
-  uint64_t i;
-  uint40 sum = 0;
-  
-  // clear all buckets
-  for(i=0; i<K; i++) bkt[i]=0; 
-  
-  // compute the size of each bucket
-  for(i=0; i<n; i++) bkt[chr(i)]++; 
-  
-  for(i=0; i<K; i++) { 
-    sum = sum + bkt[i]; 
-    bkt[i] = end ? sum-1 : sum-bkt[i]; 
-  }
+void getBuckets_k(int_t *s, uint_t *bkt, uint64_t n, unsigned int K, int end, int cs) { 
+    uint64_t i;
+    uint_t sum = uint40_from_u64(0);
+    
+    // clear all buckets
+    for(i=0; i<K; i++) bkt[i] = uint40_from_u64(0);
+    
+    // compute the size of each bucket
+    for(i=0; i<n; i++) {
+        uint_t val = bkt[chr(i)];
+        bkt[chr(i)] = uint40_inc(val);
+    }
+    
+    for(i=0; i<K; i++) { 
+        sum = uint40_add(sum, bkt[i]);
+        bkt[i] = end ? uint40_dec(sum) : uint40_sub(sum, bkt[i]);
+    }
 }
 
 /*****************************************************************************/
 
-void putSuffix0(uint40 *SA, int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int64_t n1, int cs) {
-  uint64_t i;
-  uint40 j;
+void putSuffix0(uint_t *SA, int_t *s, uint_t *bkt, uint64_t n, unsigned int K, int64_t n1, int cs) {
+    uint64_t i;
+    uint_t j;
 
-  // find the end of each bucket
-  getBuckets_k(s, bkt, n, K, true, cs);
+    // find the end of each bucket
+    getBuckets_k(s, bkt, n, K, true, cs);
 
-  // put the suffixes into their buckets
-  for(i=n1-1; i>0; i--) {
-    j=SA[i]; SA[i]=0;
-    SA[bkt[chr(j)]] = j;
-    bkt[chr(j)]--;
-  }
-  SA[0]=n-1; // set the single sentinel suffix
+    // put the suffixes into their buckets
+    for(i=n1-1; i>0; i--) {
+        j = SA[i];
+        SA[i] = uint40_from_u64(0);
+        SA[bkt[chr(uint40_to_u64(j))]] = j;
+        bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]));
+    }
+    SA[0] = uint40_from_u64(n-1); // set the single sentinel suffix
 }
 
-void putSuffix0_generalized(uint40 *SA, 
-  uint_t *s, uint40 *bkt, 
-  uint64_t n, unsigned int K, int64_t n1, int cs, uint64_t separator) {
-  uint64_t i;
-  uint40 j;
+void putSuffix0_generalized(uint_t *SA, uint_t *s, uint_t *bkt, uint64_t n, unsigned int K, int64_t n1, int cs, uint64_t separator) {
+    uint64_t i;
+    uint_t j;
 
-  // find the end of each bucket
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+    // find the end of each bucket
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
 
-  int_t tmp=bkt[separator]--;// shifts one position left of bkt[separator]
+    int_t tmp = uint40_to_u64(bkt[separator]);
+    bkt[separator] = uint40_dec(bkt[separator]); // shifts one position left of bkt[separator]
 
-  // put the suffixes into their buckets
-  for(i=n1-1; i>0; i--) {
-    j=SA[i]; SA[i]=0;
-    SA[bkt[chr(j)]] = j;
-    bkt[chr(j)]--;
-  }
+    // put the suffixes into their buckets
+    for(i=n1-1; i>0; i--) {
+        j = SA[i];
+        SA[i] = uint40_from_u64(0);
+        SA[bkt[chr(j)]] = j;
+        bkt[chr(j)] = uint40_dec(bkt[chr(j)]);
+    }
 
-  SA[tmp]=SA[0]-1;// insert the last separator at the end of bkt[separator]
+    SA[tmp] = uint40_sub(SA[0], uint40_from_u64(1)); // insert the last separator at the end of bkt[separator]
 }
 
-void putSuffix0_generalized_LCP(uint40 *SA, int_t *LCP,
-  uint_t *s, uint40 *bkt, 
-  uint64_t n, unsigned int K, int64_t n1, int cs, uint64_t separator) {
-  uint64_t i;
-  uint40 j;
-  int_t l;
+void induceSAl0(uint_t *SA, int_t *s, uint_t *bkt, uint64_t n, unsigned int K, int_t suffix, int cs) {
+    uint64_t i;
+    uint_t j;
 
-  // find the end of each bucket
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+    // find the head of each bucket
+    getBuckets_k(s, bkt, n, K, false, cs);
 
-  int_t tmp=bkt[separator]--;// shifts one position left of bkt[separator]
-
-  // put the suffixes into their buckets
-  for(i=n1-1; i>0; i--) {
-    j=SA[i]; SA[i]=U_MAX;
-    l=LCP[i]; LCP[i]=0;
-
-    SA[bkt[chr(j)]]=j;
-    LCP[bkt[chr(j)]--]=l;
-  }
-
-  SA[tmp]=SA[0]-1;// insert the last separator at the end of bkt[separator]
-  DA[tmp]= (int_da) tmp-1;
+    bkt[0] = uint40_inc(bkt[0]); // skip the virtual sentinel
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j = SA[i]-1
+            if(chr(uint40_to_u64(j)) >= chr(uint40_to_u64(j)+1)) {
+                SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                bkt[chr(uint40_to_u64(j))] = uint40_inc(bkt[chr(uint40_to_u64(j))]);
+                if(!suffix && i>0) SA[i] = uint40_from_u64(0);
+            }
+        }
+    }
 }
 
-void putSuffix0_generalized_DA(uint40 *SA, int_da *DA,
-  uint_t *s, uint40 *bkt, 
-  uint64_t n, unsigned int K, int64_t n1, int cs, uint64_t separator) {
-  uint64_t i;
-  uint40 j;
+void induceSAs0(uint_t *SA, int_t *s, uint_t *bkt, uint64_t n, unsigned int K, int_t suffix, int cs) {
+    uint64_t i;
+    uint_t j;
 
-  // find the end of each bucket
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+    // find the end of each bucket
+    getBuckets_k(s, bkt, n, K, true, cs);
 
-  int_t tmp=bkt[separator]--;// shifts one position left of bkt[separator]
-  
-  // put the suffixes into their buckets
-  for(i=n1-1; i>0; i--) {
-    j=SA[i]; SA[i]=0;
-    SA[bkt[chr(j)]]=j;
-    DA[bkt[chr(j)]--]=DA[i];
-  }
-
-  SA[tmp]=SA[0]-1;// insert the last separator at the end of bkt[separator]
-  DA[tmp]= (int_da) tmp-1;
-}
-
-void putSuffix0_generalized_LCP_DA(uint40 *SA, int_t *LCP, int_da *DA, 
-  uint_t *s, uint40 *bkt, 
-  uint64_t n, unsigned int K, int cs, uint64_t separator) {
-  uint64_t i;
-  uint40 j;
-  int_t l;
-
-  // find the end of each bucket
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
-
-  int_t tmp=bkt[separator]--;// shifts one position left of bkt[separator]
-
-  // put the suffixes into their buckets
-  for(i=n1-1; i>0; i--) {
-    j=SA[i]; SA[i]=U_MAX;
-    l=LCP[i]; LCP[i]=0;
-
-    SA[bkt[chr(j)]]=j;
-    DA[bkt[chr(j)]]=DA[i];
-    LCP[bkt[chr(j)]--]=l;
-  }
-
-  SA[tmp]=SA[0]-1;// insert the last separator at the end of bkt[separator]
-  DA[tmp]= (int_da) tmp-1;
+    for(i=n-1; i>0; i--) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j = SA[i]-1
+            if(chr(uint40_to_u64(j)) <= chr(uint40_to_u64(j)+1) && uint40_to_u64(bkt[chr(uint40_to_u64(j))]) < i) {
+                SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]);
+                if(!suffix) SA[i] = uint40_from_u64(0);
+            }
+        }
+    }
 }
 
 /*****************************************************************************/
 
-void induceSAl0(uint40 *SA, int_t *s, uint40 *bkt, uint64_t n, unsigned int K, int_t suffix, int cs) {
-  uint64_t i;
-  uint40 j;
+void induceSAl0_generalized(uint_t *SA, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, j;
 
-  // find the head of each bucket
-  getBuckets_k(s, bkt, n, K, false, cs);
+    // find the head of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, false, cs);
 
-  bkt[0]++; // skip the virtual sentinel
-  for(i=0; i<n; i++)
-    if(SA[i]>0) {
-      j=SA[i]-1;
-      if(chr(j)>=chr(j+1)) {
-        SA[bkt[chr(j)]]=j;
-        bkt[chr(j)]++;
-        if(!suffix && i>0) SA[i]=0;
-      }
+    bkt[0] = uint40_inc(bkt[0]); // skip the virtual sentinel.
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) >= chr(uint40_to_u64(j)+1)) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                    bkt[chr(uint40_to_u64(j))] = uint40_inc(bkt[chr(uint40_to_u64(j))]);
+                }
+            }
+        }
+    }
+}
+
+void induceSAs0_generalized(uint_t *SA, uint_t *s, uint_t *bkt, uint_t n, uint_t K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    for(i=n-1; i>0; i--) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) <= chr(uint40_to_u64(j)+1) && uint40_to_u64(bkt[chr(uint40_to_u64(j))]) < i) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                    bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]);
+                }
+            }
+        }
+    }
+}
+
+/*****************************************************************************/
+
+void induceSAl0_generalized_LCP(uint_t *SA, int_t *LCP, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    for(i=0; i<K; i++)
+        if(uint40_to_u64(bkt[i])+1 < n) 
+            if(uint40_to_u64(SA[uint40_to_u64(bkt[i])+1]) != U_MAX) 
+                LCP[uint40_to_u64(bkt[i])+1] = I_MIN;
+
+    // find the head of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, false, cs);
+
+    for(i=0; i<K; i++)
+        if(uint40_to_u64(bkt[i]) < n) 
+            LCP[uint40_to_u64(bkt[i])] = -2;
+
+    #if RMQ_L == 1 
+    int_t *M = (int_t *)malloc(sizeof(int_t)*K);
+    for(i=0; i<K; i++) {
+        M[i] = I_MAX;
+    }
+    #elif RMQ_L == 2
+    uint_t* last_occ = (uint_t*)malloc(K*sizeof(uint_t));
+    uint_t* tmp = (uint_t*)malloc(K*sizeof(uint_t));
+
+    t_pair_k* STACK = (t_pair_k*)malloc((STACK_SIZE_L+2)*sizeof(t_pair_k));
+    int_t top = 0;
+    stack_push_k(STACK, &top, 0, -1);//init
+    for(i=0; i<K; i++) last_occ[i] = uint40_from_u64(0);
+    #endif 
+
+    bkt[0] = uint40_inc(bkt[0]); // skip the virtual sentinel.
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) != U_MAX) {
+            if(LCP[i] == I_MIN) { //is a L/S-seam position
+                int_t l = 0;
+                if(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(SA[i]))]-1)]) < n-1)	
+                    while(chr(uint40_to_u64(SA[i])+l) == chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(SA[i]))]-1)])+l)) ++l;
+                LCP[i] = l;
+            }
+
+            #if RMQ_L == 1
+            uint_t k;
+            for(k=0; k<K; k++) 
+                if(M[k] > LCP[i]) 
+                    M[k] = maxval(0,LCP[i]);
+            #elif RMQ_L == 2
+            int_t min_lcp = 0;
+            uint_t last;
+
+            if(!uint40_to_u64(SA[i])) last = uint40_from_u64(0);
+            else {
+                last = last_occ[chr(uint40_to_u64(SA[i])-1)];
+                last_occ[chr(uint40_to_u64(SA[i])-1)] = uint40_from_u64(i+1);
+            }
+
+            int_t lcp = maxval(0,LCP[i]);
+            while(STACK[top-1].lcp >= lcp) top--;	
+
+            stack_push_k(STACK, &top, i+1, lcp);
+            j = top-1;
+
+            while(uint40_to_u64(STACK[j].idx) > uint40_to_u64(last)) j--;
+            min_lcp = STACK[j+1].lcp;
+            #endif
+
+            if(uint40_to_u64(SA[i]) > 0) {
+                j = uint40_dec(SA[i]); // j=SA[i]-1
+                if(chr(uint40_to_u64(j)) >= chr(uint40_to_u64(j)+1)) {
+                    if(chr(uint40_to_u64(j)) != separator) {
+                        SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                        #if RMQ_L == 1
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] += M[chr(uint40_to_u64(j))] + 1;
+                        M[chr(uint40_to_u64(j))] = I_MAX;
+                        #elif RMQ_L == 2
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] += min_lcp + 1;
+                        #endif
+                        bkt[chr(uint40_to_u64(j))] = uint40_inc(bkt[chr(uint40_to_u64(j))]);
+                    }
+                }
+            }
+
+            #if RMQ_L == 2
+            if(top > STACK_SIZE_L) {//if stack is full
+                int_t j;
+                memcpy(tmp, last_occ, K*sizeof(uint_t));
+                qsort(tmp, K, sizeof(uint_t), compare_k);
+
+                int_t curr = 1, end = 1;
+                STACK[top].idx = uint40_from_u64(U_MAX);
+                for(j=0; j<K; j++) {
+                    if(uint40_to_u64(STACK[end-1].idx) < uint40_to_u64(tmp[j])+1) {
+                        while(uint40_to_u64(STACK[curr].idx) < uint40_to_u64(tmp[j])+1) curr++;
+                        if(curr < top) {
+                            stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
+                            curr++;
+                        }
+                    }
+                }
+
+                if(end >= STACK_SIZE_L) {
+                    fprintf(stderr,"ERROR: induceSAl0_LCP\n");
+                    exit(1);
+                }
+                top = end;
+            }
+            #endif
+        }
+    }
+
+    #if RMQ_L == 1
+    free(M);
+    #elif RMQ_L == 2
+    free(STACK);
+    free(last_occ);
+    free(tmp);
+    #endif
+}
+
+void induceSAs0_generalized_LCP(uint_t *SA, int_t *LCP, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    #if RMQ_S == 1
+    int_t *M = (int_t *)malloc(sizeof(int_t)*K);
+    for(i=0; i<K; i++) M[i] = I_MAX;
+    #elif RMQ_S == 2
+    uint_t* last_occ = (uint_t*)malloc(K*sizeof(uint_t));
+    uint_t* tmp = (uint_t*)malloc(K*sizeof(uint_t));
+
+    t_pair_k* STACK = (t_pair_k*)malloc((STACK_SIZE_S+2)*sizeof(t_pair_k));
+    int_t top = 0;
+    stack_push_k(STACK, &top, n, -1);//init
+    for(i=0; i<K; i++) last_occ[i] = uint40_from_u64(n-1);
+    #endif
+
+    for(i=n-1; i>0; i--) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) <= chr(uint40_to_u64(j)+1) && uint40_to_u64(bkt[chr(uint40_to_u64(j))]) < i) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+
+                    #if RMQ_S == 1
+                    if(LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] >= 0)
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] = M[chr(uint40_to_u64(j))] + 1;
+
+                    if(LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] > 0)
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = I_MAX;
+                    #elif RMQ_S == 2
+                    int_t min = I_MAX, end = top-1;
+
+                    int_t last = uint40_to_u64(last_occ[chr(uint40_to_u64(j))]);
+                    while(uint40_to_u64(STACK[end].idx) <= last) end--;
+
+                    min = STACK[end+1].lcp;
+                    last_occ[chr(uint40_to_u64(j))] = uint40_from_u64(i);
+
+                    if(LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] >= 0)
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] = min + 1;
+                    #endif
+
+                    #if RMQ_S == 1
+                    M[chr(uint40_to_u64(j))] = I_MAX;
+                    #endif
+
+                    bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]);
+
+                    if(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])]) != U_MAX) {//L/S-seam
+                        int_t l = 0;
+                        while(chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1])+l) == chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])]+l))) ++l;
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] = l;
+                    }
+                }
+            }
+        }
+
+        if(LCP[i] < 0) LCP[i] = 0;
+
+        #if RMQ_S == 1
+        int_t k;
+        for(k=0; k<K; k++)
+            if(M[k] > LCP[i])
+                M[k] = LCP[i];
+        #elif RMQ_S == 2
+        int_t lcp = maxval(0,LCP[i]);
+        while(STACK[top-1].lcp >= lcp) top--;
+        stack_push_k(STACK, &top, i, lcp);
+
+        if(top >= STACK_SIZE_S) {
+            int_t j;
+            memcpy(tmp, last_occ, K*sizeof(uint_t));
+            qsort(tmp, K, sizeof(uint_t), compare_k);
+
+            int_t curr = 1, end = 1;
+            for(j=K-1; j>=0; j--) {
+                if(uint40_to_u64(tmp[j]) < uint40_to_u64(STACK[end-1].idx)) {
+                    while(uint40_to_u64(STACK[curr].idx) > uint40_to_u64(tmp[j]) && curr < top) curr++;
+                    if(curr >= top) break;
+                    stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
+                    curr++;
+                }
+            }
+
+            if(end >= STACK_SIZE_S) {
+                fprintf(stderr,"ERROR: induceSAl0_LCP\n");
+                exit(1);
+            }
+            top = end;
+        }
+        #endif
+    }
+
+    LCP[0] = 0;
+
+    #if RMQ_S == 1
+    free(M);
+    #elif RMQ_S == 2
+    free(STACK);
+    free(last_occ);
+    free(tmp);
+    #endif
+}
+
+
+/*****************************************************************************/
+
+
+void putSubstr0(uint_t *SA, int_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs) {
+    uint_t i, cur_t, succ_t;
+
+    // find the end of each bucket.
+    getBuckets_k(s, bkt, n, K, true, cs);
+
+    // set each item in SA as empty.
+    for(i=0; i<n; i++) SA[i]=0;
+
+    succ_t=0; // s[n-2] must be L-type.
+    for(i=n-2; i>0; i--) {
+        cur_t=(chr(i-1)<chr(i) ||
+               (chr(i-1)==chr(i) && succ_t==1
+              )?1:0;
+        if(cur_t==0 && succ_t==1) SA[bkt[chr(i)]--]=i;
+        succ_t=cur_t;
+    }
+
+    // set the single sentinel LMS-substring.
+    SA[0]=n-1;
+}
+
+/*****************************************************************************/
+void putSubstr0_generalized(uint_t *SA, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, cur_t, succ_t;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    // set each item in SA as empty.
+    for(i=0; i<n; i++) SA[i] = uint40_from_u64(0);
+
+    // gsa-is
+    int_t tmp = uint40_to_u64(bkt[separator]);
+    bkt[separator] = uint40_dec(bkt[separator]); // shifts one position left of bkt[separator]
+    
+    SA[0] = uint40_from_u64(n-1); // set the single sentinel LMS-substring.
+    SA[tmp] = uint40_sub(SA[0], uint40_from_u64(1)); // insert the last separator at the end of bkt[separator]
+
+    succ_t = 0; // s[n-2] must be L-type.
+    for(i=n-2; i>0; i--) {
+        cur_t = (chr(uint40_to_u64(i)-1) < chr(uint40_to_u64(i)) ||
+                (chr(uint40_to_u64(i)-1) == chr(uint40_to_u64(i)) && succ_t==1)
+               ) ? 1 : 0;
+        if(cur_t==0 && succ_t==1) {
+            if(chr(uint40_to_u64(i)) != separator) {
+                SA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+                bkt[chr(uint40_to_u64(i))] = uint40_dec(bkt[chr(uint40_to_u64(i))]);
+            }
+        }
+        succ_t = cur_t;
     }
 }
 
@@ -290,128 +564,112 @@ void induceSAl0_generalized_LCP(uint_t *SA, int_t *LCP,
   uint_t n, unsigned int K, int cs, uint_t separator) {
   uint_t i, j;
 
-  for(i=0;i<K;i++)
-    if(bkt[i]+1<n) if(SA[bkt[i]+1]!=U_MAX) LCP[bkt[i]+1]=I_MIN;
+  for(i=0; i<K; i++)
+    if(uint40_to_u64(bkt[i])+1 < n) 
+        if(uint40_to_u64(SA[uint40_to_u64(bkt[i])+1]) != U_MAX) 
+            LCP[uint40_to_u64(bkt[i])+1] = I_MIN;
 
   // find the head of each bucket.
   getBuckets_k((int_t*)s, bkt, n, K, false, cs);
 
-  for(i=0;i<K;i++)
-    if(bkt[i]<n) LCP[bkt[i]]=-2;
+  for(i=0; i<K; i++)
+    if(uint40_to_u64(bkt[i]) < n) 
+        LCP[uint40_to_u64(bkt[i])] = -2;
 
   #if RMQ_L == 1 
-  int_t *M=(int_t *)malloc(sizeof(int_t)*K);
-  for(i=0;i<K;i++){
-    M[i]=I_MAX;
+  int_t *M = (int_t *)malloc(sizeof(int_t)*K);
+  for(i=0; i<K; i++) {
+      M[i] = I_MAX;
   }
   #elif RMQ_L == 2
-  uint_t* last_occ = (uint_t*) malloc(K*sizeof(uint_t));
-  uint_t* tmp = (uint_t*) malloc(K*sizeof(uint_t));
+  uint_t* last_occ = (uint_t*)malloc(K*sizeof(uint_t));
+  uint_t* tmp = (uint_t*)malloc(K*sizeof(uint_t));
 
-  t_pair_k* STACK = (t_pair_k*) malloc((STACK_SIZE_L+2)*sizeof(t_pair_k));
+  t_pair_k* STACK = (t_pair_k*)malloc((STACK_SIZE_L+2)*sizeof(t_pair_k));
   int_t top = 0;
   stack_push_k(STACK, &top, 0, -1);//init
-  for(i=0;i<K;i++) last_occ[i]=0;
+  for(i=0; i<K; i++) last_occ[i] = uint40_from_u64(0);
   #endif 
 
-  #if DEBUG
-  printf("inducing..\n");
-  for(i=0; i<n; i++)
-        printf("%" PRIdN "\t", SA[i]+1);
-  printf("\n");
-  printf("LCP\n");
-  for(i=0; i<n; i++)
-        printf("%" PRIdN "\t", LCP[i]);
-  printf("\n\n");
-  #endif
+  bkt[0] = uint40_inc(bkt[0]); // skip the virtual sentinel.
+  for(i=0; i<n; i++) {
+      if(uint40_to_u64(SA[i]) != U_MAX) {
+          if(LCP[i] == I_MIN) { //is a L/S-seam position
+              int_t l = 0;
+              if(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(SA[i]))]-1)]) < n-1)	
+                  while(chr(uint40_to_u64(SA[i])+l) == chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(SA[i]))]-1)])+l)) ++l;
+              LCP[i] = l;
+          }
 
-  bkt[0]++; // skip the virtual sentinel.
-  for(i=0; i<n; i++){
-    if(SA[i]!=U_MAX){
+          #if RMQ_L == 1
+          uint_t k;
+          for(k=0; k<K; k++) 
+              if(M[k] > LCP[i]) 
+                  M[k] = maxval(0,LCP[i]);
+          #elif RMQ_L == 2
+          int_t min_lcp = 0;
+          uint_t last;
 
-      if(LCP[i]==I_MIN){ //is a L/S-seam position
-  	  int_t l=0;
-	  if(SA[bkt[chr(SA[i])]-1]<n-1)	
-   	    while(chr(SA[i]+l)==chr(SA[bkt[chr(SA[i])]-1]+l))++l;
-  	  LCP[i]=l;
+          if(!uint40_to_u64(SA[i])) last = uint40_from_u64(0);
+          else {
+              last = last_occ[chr(uint40_to_u64(SA[i])-1)];
+              last_occ[chr(uint40_to_u64(SA[i])-1)] = uint40_from_u64(i+1);
+          }
+
+          int_t lcp = maxval(0,LCP[i]);
+          while(STACK[top-1].lcp >= lcp) top--;	
+
+          stack_push_k(STACK, &top, i+1, lcp);
+          j = top-1;
+
+          while(uint40_to_u64(STACK[j].idx) > uint40_to_u64(last)) j--;
+          min_lcp = STACK[j+1].lcp;
+          #endif
+
+          if(uint40_to_u64(SA[i]) > 0) {
+              j = uint40_dec(SA[i]); // j=SA[i]-1
+              if(chr(uint40_to_u64(j)) >= chr(uint40_to_u64(j)+1))) {
+                  if(chr(uint40_to_u64(j)) != separator) {
+                      SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                      #if RMQ_L == 1
+                      LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] += M[chr(uint40_to_u64(j))] + 1;
+                      M[chr(uint40_to_u64(j))] = I_MAX;
+                      #elif RMQ_L == 2
+                      LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] += min_lcp + 1;
+                      #endif
+                      bkt[chr(uint40_to_u64(j))] = uint40_inc(bkt[chr(uint40_to_u64(j))]);
+                  }
+              }
+          }
+
+          #if RMQ_L == 2
+          if(top > STACK_SIZE_L) {//if stack is full
+              int_t j;
+              memcpy(tmp, last_occ, K*sizeof(uint_t));
+              qsort(tmp, K, sizeof(uint_t), compare_k);
+
+              int_t curr = 1, end = 1;
+              STACK[top].idx = uint40_from_u64(U_MAX);
+              for(j=0; j<K; j++) {
+                  if(uint40_to_u64(STACK[end-1].idx) < uint40_to_u64(tmp[j])+1) {
+                      while(uint40_to_u64(STACK[curr].idx) < uint40_to_u64(tmp[j])+1) curr++;
+                      if(curr < top) {
+                          stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
+                          curr++;
+                      }
+                  }
+              }
+
+              if(end >= STACK_SIZE_L) {
+                  fprintf(stderr,"ERROR: induceSAl0_LCP\n");
+                  exit(1);
+              }
+              top = end;
+          }
+          #endif
       }
-      #if RMQ_L == 1
-        uint_t k;
-        for(k=0; k<K; k++) if(M[k]>LCP[i]) M[k] = maxval(0,LCP[i]);
-      #elif RMQ_L == 2
-        int_t min_lcp=0;
-        uint_t last;
-
-        if(!SA[i]) last = 0;
-        else{
-          last = last_occ[chr(SA[i]-1)];
-          last_occ[chr(SA[i]-1)] = i+1;
-        }
- 
-        int_t lcp=maxval(0,LCP[i]);
-        while(STACK[(top)-1].lcp>=lcp) (top)--;	
-
-        stack_push_k(STACK, &top, i+1, lcp);
-        j = top-1;
-
-        while(STACK[j].idx>last) j--;
-        min_lcp=STACK[(j+1)].lcp;
-
-      #endif
-
-      if(SA[i]>0) {
-        j=SA[i]-1;
-        if(chr(j)>=chr(j+1))
-  	if(chr(j)!=separator){//gsa-is
-            SA[bkt[chr(j)]]=j;
-
-            #if RMQ_L == 1
-  	      LCP[bkt[chr(j)]]+=M[chr(j)]+1;
-    	      M[chr(j)] = I_MAX;
-            #elif RMQ_L == 2
-  	      LCP[bkt[chr(j)]]+=min_lcp+1; 
-            #endif
-  
-            bkt[chr(j)]++;
-	}
-      	if(bkt[chr(SA[i])]-1<i){ //if is LMS-type
-	  if(chr(SA[i])!=separator)
-	  SA[i]=U_MAX;
-        }
-
-      }
-      #if RMQ_L == 2
-      if(top>STACK_SIZE_L){//if stack is full
-
-        int_t j;
-        memcpy(tmp, last_occ, K*sizeof(uint_t));
-        qsort(tmp, K, sizeof(uint_t), compare_k);
-       
-        int_t curr=1, end=1;
-        STACK[top].idx=U_MAX;
-        for(j=0;j<K; j++){
-
-          if(STACK[end-1].idx < tmp[j]+1){
-
-            while(STACK[curr].idx<tmp[j]+1) curr++;
-
-            if(curr<top){
-	      stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
-	      curr++;
-            }
-	  }
-        }
- 
-        if(end>=STACK_SIZE_L){
-          fprintf(stderr,"ERROR: induceSAl0_LCP\n");
-          exit(1);
-        }
-
-        top = end;
-      }
-      #endif
-    }
   }
+
   #if RMQ_L == 1
   free(M);
   #elif RMQ_L == 2
@@ -419,421 +677,49 @@ void induceSAl0_generalized_LCP(uint_t *SA, int_t *LCP,
   free(last_occ);
   free(tmp);
   #endif
-
 }
 
-void induceSAs0_generalized_LCP(uint_t *SA, int_t* LCP,
-  uint_t *s, uint_t *bkt,
-  uint_t n, uint_t K, int cs, uint_t separator) {
-  uint_t i, j;
+void induceSAs0_generalized_LCP(uint_t *SA, int_t *LCP, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, j;
 
-  // find the end of each bucket.
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
 
-  #if RMQ_S == 1
-  int_t *M=(int_t *)malloc(sizeof(int_t)*K);
-  for(i=0;i<K;i++) M[i]=I_MAX;
-  #elif RMQ_S == 2 
-  uint_t* last_occ = (uint_t*) malloc(K*sizeof(uint_t));
-  uint_t* tmp = (uint_t*) malloc(K*sizeof(uint_t));
-
-  t_pair_k* STACK = (t_pair_k*) malloc((STACK_SIZE_S+2)*sizeof(t_pair_k));
-  int_t top = 0;
-  stack_push_k(STACK, &top, n, -1); //init
-  for(i=0;i<K;i++) last_occ[i]=n-1;
-  #endif
-
-  for(i=n-1; i>0; i--){
-    if(SA[i]>0) {
-      j=SA[i]-1;
-      if(chr(j)<=chr(j+1) && bkt[chr(j)]<i)// induce S-type
-        if(chr(j)!=separator){
-	  SA[bkt[chr(j)]]=j;
-
-          #if RMQ_S == 1
-  	    if(LCP[bkt[chr(j)]+1]>=0) 
-  	      LCP[bkt[chr(j)]+1]=M[chr(j)]+1;
-  	  
-	    if(LCP[bkt[chr(j)]]>0) 
-  	      LCP[bkt[chr(j)]]=I_MAX;
-
-          #elif RMQ_S == 2
-            int_t min = I_MAX, end = top-1; 
-  
-  	    int_t last=last_occ[chr(j)];
-            while(STACK[end].idx<=last) end--;
-  
-            min=STACK[(end+1)].lcp;
-            last_occ[chr(j)] = i;
-  
-  	    if(LCP[bkt[chr(j)]+1]>=0) 
-              LCP[bkt[chr(j)]+1]=min+1;
-          #endif
-  
-
-          #if RMQ_S == 1
-  	  M[chr(j)] = I_MAX;
-          #endif
-  
-          bkt[chr(j)]--;
- 
-  	  if(SA[bkt[chr(j)]]!=U_MAX) {//L/S-seam
-            int_t l=0;	
-            while(chr(SA[bkt[chr(j)]]+1]+l)==chr(SA[bkt[chr(j)]]+l))++l;
-            LCP[bkt[chr(j)]+1]=l;
-  	  }
-  	}
-     }
-
-    if(LCP[i]<0) LCP[i]=0;
     #if RMQ_S == 1
-      int_t k;
-      for(k=0; k<K; k++) if(M[k]>LCP[i]) M[k] = LCP[i];
+    int_t *M = (int_t *)malloc(sizeof(int_t)*K);
+    for(i=0; i<K; i++) M[i] = I_MAX;
     #elif RMQ_S == 2
+    uint_t* last_occ = (uint_t*)malloc(K*sizeof(uint_t));
+    uint_t* tmp = (uint_t*)malloc(K*sizeof(uint_t));
 
-      int_t lcp=maxval(0,LCP[i]);
+    t_pair_k* STACK = (t_pair_k*)malloc((STACK_SIZE_S+2)*sizeof(t_pair_k));
+    int_t top = 0;
+    stack_push_k(STACK, &top, n, -1);//init
+    for(i=0; i<K; i++) last_occ[i] = uint40_from_u64(n-1);
+    #endif
 
-      while(STACK[(top)-1].lcp>=lcp) (top)--;
-      stack_push_k(STACK, &top, i, lcp);
-
-      if(top>=STACK_SIZE_S){
-
-          int_t j;
-          memcpy(tmp, last_occ, K*sizeof(uint_t));
-          qsort(tmp, K, sizeof(uint_t), compare_k);
-
-          int_t curr=1, end=1;
-
-	   for(j=K-1;j>=0; j--){
-
-            if(tmp[j] < STACK[end-1].idx){
-
-  	      while(STACK[curr].idx>tmp[j] && curr < top) curr++;
-	      if(curr>=top) break;
-	      stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
-	      curr++;
+    for(i=n-1; i>0; i--) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) <= chr(uint40_to_u64(j)+1) && uint40_to_u64(bkt[chr(uint40_to_u64(j))]) < i) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                    DA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = DA[i];
+                    bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]);
+                }
             }
-          } 
-
-          if(end>=STACK_SIZE_S){
-            fprintf(stderr,"ERROR: induceSAl0_LCP\n");
-            exit(1);
-          }
-          top = end;
-      }
-      #endif
-
-  }
-
-  LCP[0]=0;
-
-  //variant 1
-  #if RMQ_S == 1
-  free(M);
-  #elif RMQ_S == 2
-  free(STACK);
-  free(last_occ);
-  free(tmp);
-  #endif
-}
-
-
-/*****************************************************************************/
-
-void induceSAl0_generalized_DA(uint_t *SA, int_da* DA,
-  uint_t *s, uint_t *bkt,
-  uint_t n, unsigned int K, int cs, uint_t separator) {
-  uint_t i, j;
-
-  // find the head of each bucket.
-  getBuckets_k((int_t*)s, bkt, n, K, false, cs);
-
-  bkt[0]++; // skip the virtual sentinel.
-  for(i=0; i<n; i++)
-    if(SA[i]>0) {
-      j=SA[i]-1;
-      if(chr(j)>=chr(j+1) ) {
-	    if(chr(j)!=separator){//gsa-is
-          SA[bkt[chr(j)]]=j;
-          DA[bkt[chr(j)]++]=DA[i];
-	    }
-      }
-    }
-}
-
-void induceSAs0_generalized_DA(uint_t *SA, int_da* DA,
-  uint_t *s, uint_t *bkt,
-  uint_t n, uint_t K, int cs, uint_t separator) {
-  uint_t i, j;
-
-  // find the end of each bucket.
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
-
-  for(i=n-1; i>0; i--)
-    if(SA[i]>0) {
-      j=SA[i]-1;
-      if(chr(j)<=chr(j+1) && bkt[chr(j)]<i) {
-        if(chr(j)!=separator){
-		  SA[bkt[chr(j)]]=j;
-		  DA[bkt[chr(j)]--]=DA[i];
-	    }
-      }
-    }
-}
-
-/*****************************************************************************/
-
-void induceSAl0_generalized_LCP_DA(uint_t *SA, int_t *LCP, int_da *DA, 
-  uint_t *s, uint_t *bkt, 
-  uint_t n, unsigned int K, int cs, uint_t separator) {
-  uint_t i, j;
-
-  for(i=0;i<K;i++)
-    if(bkt[i]+1<n) if(SA[bkt[i]+1]!=U_MAX) LCP[bkt[i]+1]=I_MIN;
-
-  // find the head of each bucket.
-  getBuckets_k((int_t*)s, bkt, n, K, false, cs);
-
-  for(i=0;i<K;i++)
-    if(bkt[i]<n) LCP[bkt[i]]=-2;
-
-  #if RMQ_L == 1 
-  int_t *M=(int_t *)malloc(sizeof(int_t)*K);
-  for(i=0;i<K;i++){
-    M[i]=I_MAX;
-  }
-  #elif RMQ_L == 2
-  uint_t* last_occ = (uint_t*) malloc(K*sizeof(uint_t));
-  uint_t* tmp = (uint_t*) malloc(K*sizeof(uint_t));
-
-  t_pair_k* STACK = (t_pair_k*) malloc((STACK_SIZE_L+2)*sizeof(t_pair_k));
-  int_t top = 0;
-  stack_push_k(STACK, &top, 0, -1);//init
-  for(i=0;i<K;i++) last_occ[i]=0;
-  #endif 
-
-  #if DEBUG
-  printf("inducing..\n");
-  for(i=0; i<n; i++)
-        printf("%" PRIdN "\t", SA[i]+1);
-  printf("\n");
-  printf("LCP\n");
-  for(i=0; i<n; i++)
-        printf("%" PRIdN "\t", LCP[i]);
-  printf("\n\n");
-  #endif
-
-  bkt[0]++; // skip the virtual sentinel.
-  for(i=0; i<n; i++){
-    if(SA[i]!=U_MAX){
-
-      if(LCP[i]==I_MIN){ //is a L/S-seam position
-  	  int_t l=0;
-		  if(SA[bkt[chr(SA[i])]-1]<n-1)	
-   	    while(chr(SA[i]+l)==chr(SA[bkt[chr(SA[i])]-1]+l))++l;
-  	  LCP[i]=l;
-      }
-      #if RMQ_L == 1
-        uint_t k;
-        for(k=0; k<K; k++) if(M[k]>LCP[i]) M[k] = maxval(0,LCP[i]);
-      #elif RMQ_L == 2
-        int_t min_lcp=0;
-        uint_t last;
-
-        if(!SA[i]) last = 0;
-        else{
-          last = last_occ[chr(SA[i]-1)];
-          last_occ[chr(SA[i]-1)] = i+1;
         }
- 
-        int_t lcp=maxval(0,LCP[i]);
-        while(STACK[(top)-1].lcp>=lcp) (top)--;	
-
-        stack_push_k(STACK, &top, i+1, lcp);
-        j = top-1;
-
-        while(STACK[j].idx>last) j--;
-        min_lcp=STACK[(j+1)].lcp;
-
-      #endif
-
-      if(SA[i]>0) {
-        j=SA[i]-1;
-        if(chr(j)>=chr(j+1))
-					if(chr(j)!=separator){//gsa-is
-            SA[bkt[chr(j)]]=j;
-            DA[bkt[chr(j)]]=DA[i];
-
-            #if RMQ_L == 1
-							LCP[bkt[chr(j)]]+=M[chr(j)]+1;
-	    	      M[chr(j)] = I_MAX;
-            #elif RMQ_L == 2
-				      LCP[bkt[chr(j)]]+=min_lcp+1; 
-            #endif
-  
-            bkt[chr(j)]++;
-				}
-      	if(bkt[chr(SA[i])]-1<i){ //if is LMS-type
-					if(chr(SA[i])!=separator)
-					SA[i]=U_MAX;
-        }
-      }
-      #if RMQ_L == 2
-      if(top>STACK_SIZE_L){//if stack is full
-
-        int_t j;
-        memcpy(tmp, last_occ, K*sizeof(uint_t));
-        qsort(tmp, K, sizeof(uint_t), compare_k);
-       
-        int_t curr=1, end=1;
-        STACK[top].idx=U_MAX;
-        for(j=0;j<K; j++){
-
-          if(STACK[end-1].idx < tmp[j]+1){
-
-            while(STACK[curr].idx<tmp[j]+1) curr++;
-
-            if(curr<top){
-	      stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
-	      curr++;
-            }
-	  }
-        }
- 
-        if(end>=STACK_SIZE_L){
-          fprintf(stderr,"ERROR: induceSAl0_LCP\n");
-          exit(1);
-        }
-
-        top = end;
-      }
-      #endif
-    }
-  }
-  #if RMQ_L == 1
-  free(M);
-  #elif RMQ_L == 2
-  free(STACK);
-  free(last_occ);
-  free(tmp);
-  #endif
-
-}
-
-void induceSAs0_generalized_LCP_DA(uint_t *SA, int_t* LCP, int_da* DA,
-  uint_t *s, uint_t *bkt,
-  uint_t n, uint_t K, int cs, uint_t separator) {
-  uint_t i, j;
-
-  // find the end of each bucket.
-  getBuckets_k((int_t*)s, bkt, n, K, true, cs);
-
-  #if RMQ_S == 1
-  int_t *M=(int_t *)malloc(sizeof(int_t)*K);
-  for(i=0;i<K;i++) M[i]=I_MAX;
-  #elif RMQ_S == 2 
-  uint_t* last_occ = (uint_t*) malloc(K*sizeof(uint_t));
-  uint_t* tmp = (uint_t*) malloc(K*sizeof(uint_t));
-
-  t_pair_k* STACK = (t_pair_k*) malloc((STACK_SIZE_S+2)*sizeof(t_pair_k));
-  int_t top = 0;
-  stack_push_k(STACK, &top, n, -1); //init
-  for(i=0;i<K;i++) last_occ[i]=n-1;
-  #endif
-
-  for(i=n-1; i>0; i--){
-    if(SA[i]>0) {
-      j=SA[i]-1;
-      if(chr(j)<=chr(j+1) && bkt[chr(j)]<i)// induce S-type
-      if(chr(j)!=separator){
-	    SA[bkt[chr(j)]]=j;
-        DA[bkt[chr(j)]]=DA[i];
-      
-        #if RMQ_S == 1
-  	    if(LCP[bkt[chr(j)]+1]>=0) 
-  	      LCP[bkt[chr(j)]+1]=M[chr(j)]+1;
-
-	    if(LCP[bkt[chr(j)]]>0) 
-  	      LCP[bkt[chr(j)]]=I_MAX;
-
-        #elif RMQ_S == 2
-          int_t min = I_MAX, end = top-1; 
-  
-          int_t last=last_occ[chr(j)];
-          while(STACK[end].idx<=last) end--;
-  
-          min=STACK[(end+1)].lcp;
-          last_occ[chr(j)] = i;
-  
-  	      if(LCP[bkt[chr(j)]+1]>=0) 
-            LCP[bkt[chr(j)]+1]=min+1;
-        #endif
-  
-
-        #if RMQ_S == 1
-          M[chr(j)] = I_MAX;
-        #endif
-  
-        bkt[chr(j)]--;
- 
-        if(SA[bkt[chr(j)]]!=U_MAX) {//L/S-seam
-              int_t l=0;	
-              while(chr(SA[bkt[chr(j)]]+1]+l)==chr(SA[bkt[chr(j)]]+l))++l;
-              LCP[bkt[chr(j)]+1]=l;
-        }
-      }
     }
 
-    if(LCP[i]<0) LCP[i]=0;
+    LCP[0] = 0;
+
     #if RMQ_S == 1
-      int_t k;
-      for(k=0; k<K; k++) if(M[k]>LCP[i]) M[k] = LCP[i];
+    free(M);
     #elif RMQ_S == 2
-
-      int_t lcp=maxval(0,LCP[i]);
-
-      while(STACK[(top)-1].lcp>=lcp) (top)--;
-      stack_push_k(STACK, &top, i, lcp);
-
-      if(top>=STACK_SIZE_S){
-
-          int_t j;
-          memcpy(tmp, last_occ, K*sizeof(uint_t));
-          qsort(tmp, K, sizeof(uint_t), compare_k);
-
-          int_t curr=1, end=1;
-
-	   for(j=K-1;j>=0; j--){
-
-            if(tmp[j] < STACK[end-1].idx){
-
-  	      while(STACK[curr].idx>tmp[j] && curr < top) curr++;
-	      if(curr>=top) break;
-	      stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
-	      curr++;
-            }
-          } 
-
-          if(end>=STACK_SIZE_S){
-            fprintf(stderr,"ERROR: induceSAl0_LCP\n");
-            exit(1);
-          }
-          top = end;
-      }
-      #endif
-
-  }
-
-  LCP[0]=0;
-
-  //variant 1
-  #if RMQ_S == 1
-  free(M);
-  #elif RMQ_S == 2
-  free(STACK);
-  free(last_occ);
-  free(tmp);
-  #endif
+    free(STACK);
+    free(last_occ);
+    free(tmp);
+    #endif
 }
 
 
@@ -874,31 +760,27 @@ void putSubstr0_generalized(uint_t *SA,
   getBuckets_k((int_t*)s, bkt, n, K, true, cs);
 
   // set each item in SA as empty.
-  for(i=0; i<n; i++) SA[i]=0;
+  for(i=0; i<n; i++) SA[i] = uint40_from_u64(0);
 
   // gsa-is
-  int_t tmp=bkt[separator]--;// shifts one position left of bkt[separator]
+  int_t tmp = uint40_to_u64(bkt[separator]);
+  bkt[separator] = uint40_dec(bkt[separator]); // shifts one position left of bkt[separator]
   
-  SA[0]=n-1;// set the single sentinel LMS-substring.
+  SA[0] = uint40_from_u64(n-1); // set the single sentinel LMS-substring.
+  SA[tmp] = uint40_sub(SA[0], uint40_from_u64(1)); // insert the last separator at the end of bkt[separator]
 
-  SA[tmp] = SA[0]-1; // insert the last separator at the end of bkt[separator]
-
-  int_t p=n-2;
-
-  succ_t=0; // s[n-2] must be L-type.
+  succ_t = 0; // s[n-2] must be L-type.
   for(i=n-2; i>0; i--) {
-    cur_t=(chr(i-1)<chr(i) ||
-           (chr(i-1)==chr(i) && succ_t==1)
-          )?1:0;
-    if(cur_t==0 && succ_t==1){
-
-      if(chr(i)==separator)
-        SA[++bkt[chr(p)]]=0; // removes LMS-positions that induces separator suffixes
-
-      SA[bkt[chr(i)]--]=i;
-      p=i;
+    cur_t = (chr(uint40_to_u64(i)-1) < chr(uint40_to_u64(i)) ||
+            (chr(uint40_to_u64(i)-1) == chr(uint40_to_u64(i)) && succ_t==1)
+           ? 1 : 0;
+    if(cur_t==0 && succ_t==1) {
+      if(chr(uint40_to_u64(i)) != separator) {
+        SA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+        bkt[chr(uint40_to_u64(i))] = uint40_dec(bkt[chr(uint40_to_u64(i))]);
+      }
     }
-    succ_t=cur_t;
+    succ_t = cur_t;
   }
 }
 /*****************************************************************************/
@@ -1447,7 +1329,7 @@ int SACA_K(int_t *s, uint40 *SA,
   
   for(i=n1-1; i>0; i--) {
     j=s1[SA1[i]]; SA1[i]=0;
-    SA[bkt[chr(j)]--]=j;
+    SA[bkt[chr(j)]]--]=j;
   }
   
   induceSAl0(SA, s, bkt, n, K, false, cs);
@@ -1477,8 +1359,8 @@ int gSACA_K(uint_t *s, uint40 *SA,
   if(bkt == NULL) return -1;
   
   putSubstr0_generalized(SA, s, bkt, n, K, cs, separator);
-  induceSAl0(SA, (int_t*)s, bkt, n, K, false, cs);
-  induceSAs0(SA, (int_t*)s, bkt, n, K, false, cs);
+  induceSAl0_generalized(SA, s, bkt, n, K, false, cs, separator);
+  induceSAs0_generalized(SA, s, bkt, n, K, false, cs, separator);
   
   free(bkt);
   
@@ -1520,7 +1402,7 @@ int gSACA_K(uint_t *s, uint40 *SA,
   
   for(i=n1-1; i>0; i--) {
     j=s1[SA1[i]]; SA1[i]=0;
-    SA[bkt[chr(j)]--]=j;
+    SA[bkt[chr(j)]]--]=j;
   }
   
   induceSAl0(SA, (int_t*)s, bkt, n, K, false, cs);
@@ -1533,39 +1415,39 @@ int gSACA_K(uint_t *s, uint40 *SA,
 
 /*****************************************************************************/
 
-int sacak(unsigned char *s, uint40 *SA, uint64_t n) {
-  if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
-  return SACA_K((int_t*)s, SA, n, 256, n, sizeof(char), 0);
+int sacak(unsigned char *s, uint_t *SA, uint64_t n) {
+    if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
+    return SACA_K((int_t*)s, SA, n, 256, n, sizeof(char), 0);
 }
 
-int sacak_int(int_text *s, uint40 *SA, uint64_t n, uint64_t k) {
-  if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
-  return SACA_K((int_t*)s, SA, n, k, n, sizeof(int_text), 0);
+int sacak_int(int_text *s, uint_t *SA, uint64_t n, uint64_t k) {
+    if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
+    return SACA_K((int_t*)s, SA, n, k, n, sizeof(int_text), 0);
 }
 
-int gsacak(unsigned char *s, uint40 *SA, int_t *LCP, int_da *DA, uint64_t n) {
-  if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
+int gsacak(unsigned char *s, uint_t *SA, int_t *LCP, int_da *DA, uint64_t n) {
+    if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
 
-  int_t i;
-  for(i=0; i<n; i++) SA[i]=0;
-  if(LCP!=NULL) for(i=0; i<n; i++) LCP[i]=0;
-  if(DA!=NULL) for(i=0; i<n; i++) DA[i]=0;
+    int_t i;
+    for(i=0; i<n; i++) SA[i] = uint40_from_u64(0);
+    if(LCP!=NULL) for(i=0; i<n; i++) LCP[i]=0;
+    if(DA!=NULL) for(i=0; i<n; i++) DA[i]=uint40_from_u64(0);
 
-  #if EMPTY_STRING
-    for(i=0; i<n-1; i++) if(s[i]==1 && s[i+1]==1) return -2; 
-  #endif  
+    #if EMPTY_STRING
+        for(i=0; i<n-1; i++) if(s[i]==1 && s[i+1]==1) return -2; 
+    #endif  
 
-  if((LCP == NULL) && (DA == NULL))
-    return gSACA_K((uint_t*)s, SA, n, 256, sizeof(char), 1, 0);
-  else if (DA == NULL)
-    return gSACA_K_LCP((uint_t*)s, SA, LCP, n, 256, sizeof(char), 1, 0);
-  else if (LCP == NULL)
-    return gSACA_K_DA((uint_t*)s, SA, DA, n, 256, sizeof(char), 1, 0);
-  else
-    return gSACA_K_LCP_DA((uint_t*)s, SA, LCP, DA, n, 256, sizeof(char), 1, 0);
+    if((LCP == NULL) && (DA == NULL))
+        return gSACA_K((uint_t*)s, SA, n, 256, sizeof(char), 1, 0);
+    else if (DA == NULL)
+        return gSACA_K_LCP((uint_t*)s, SA, LCP, n, 256, sizeof(char), 1, 0);
+    else if (LCP == NULL)
+        return gSACA_K_DA((uint_t*)s, SA, DA, n, 256, sizeof(char), 1, 0);
+    else
+        return gSACA_K_LCP_DA((uint_t*)s, SA, LCP, DA, n, 256, sizeof(char), 1, 0);
 }
 
-int gsacak_int(int_text *s, uint40 *SA, int_t *LCP, int_da *DA, uint64_t n, uint64_t k) {
+int gsacak_int(int_text *s, uint_t *SA, int_t *LCP, int_da *DA, uint64_t n, uint64_t k) {
   if((s == NULL) || (SA == NULL) || (n < 0)) return -1;
 
   int_t i;
@@ -1588,3 +1470,687 @@ int gsacak_int(int_text *s, uint40 *SA, int_t *LCP, int_da *DA, uint64_t n, uint
 }
 
 /*****************************************************************************/
+
+void putSubstr0_generalized_LCP(uint_t *SA, int_t *LCP, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, cur_t, succ_t;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    // set each item in SA as empty.
+    for(i=0; i<n; i++) {
+        SA[i] = uint40_from_u64(0);
+        LCP[i] = 0;
+    }
+
+    // gsa-is
+    int_t tmp = uint40_to_u64(bkt[separator]);
+    bkt[separator] = uint40_dec(bkt[separator]); // shifts one position left of bkt[separator]
+    
+    SA[0] = uint40_from_u64(n-1); // set the single sentinel LMS-substring.
+    LCP[0] = 0;
+
+    SA[tmp] = uint40_sub(SA[0], uint40_from_u64(1)); // insert the last separator at the end of bkt[separator]
+    LCP[tmp] = 0;
+
+    succ_t = 0; // s[n-2] must be L-type.
+    for(i=n-2; i>0; i--) {
+        cur_t = (chr(uint40_to_u64(i)-1) < chr(uint40_to_u64(i)) ||
+                (chr(uint40_to_u64(i)-1) == chr(uint40_to_u64(i)) && succ_t==1)
+               ? 1 : 0;
+        if(cur_t==0 && succ_t==1) {
+            if(chr(uint40_to_u64(i)) != separator) {
+                SA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+                LCP[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = 0;
+                bkt[chr(uint40_to_u64(i))] = uint40_dec(bkt[chr(uint40_to_u64(i))]);
+            }
+        }
+        succ_t = cur_t;
+    }
+}
+
+void putSubstr0_generalized_DA(uint_t *SA, int_da *DA, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, cur_t, succ_t;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    // set each item in SA as empty.
+    for(i=0; i<n; i++) {
+        SA[i] = uint40_from_u64(0);
+        DA[i] = uint40_from_u64(0);
+    }
+
+    // gsa-is
+    int_t tmp = uint40_to_u64(bkt[separator]);
+    bkt[separator] = uint40_dec(bkt[separator]); // shifts one position left of bkt[separator]
+    
+    SA[0] = uint40_from_u64(n-1); // set the single sentinel LMS-substring.
+    DA[0] = uint40_from_u64(0);
+
+    SA[tmp] = uint40_sub(SA[0], uint40_from_u64(1)); // insert the last separator at the end of bkt[separator]
+    DA[tmp] = uint40_from_u64(tmp-1);
+
+    succ_t = 0; // s[n-2] must be L-type.
+    for(i=n-2; i>0; i--) {
+        cur_t = (chr(uint40_to_u64(i)-1) < chr(uint40_to_u64(i)) ||
+                (chr(uint40_to_u64(i)-1) == chr(uint40_to_u64(i)) && succ_t==1)
+               ? 1 : 0;
+        if(cur_t==0 && succ_t==1) {
+            if(chr(uint40_to_u64(i)) != separator) {
+                SA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+                DA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+                bkt[chr(uint40_to_u64(i)))] = uint40_dec(bkt[chr(uint40_to_u64(i)))]);
+            }
+        }
+        succ_t = cur_t;
+    }
+}
+
+void putSubstr0_generalized_LCP_DA(uint_t *SA, int_t *LCP, int_da *DA, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, cur_t, succ_t;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    // set each item in SA as empty.
+    for(i=0; i<n; i++) {
+        SA[i] = uint40_from_u64(0);
+        LCP[i] = 0;
+        DA[i] = uint40_from_u64(0);
+    }
+
+    // gsa-is
+    int_t tmp = uint40_to_u64(bkt[separator]);
+    bkt[separator] = uint40_dec(bkt[separator]); // shifts one position left of bkt[separator]
+    
+    SA[0] = uint40_from_u64(n-1); // set the single sentinel LMS-substring.
+    LCP[0] = 0;
+    DA[0] = uint40_from_u64(0);
+
+    SA[tmp] = uint40_sub(SA[0], uint40_from_u64(1)); // insert the last separator at the end of bkt[separator]
+    LCP[tmp] = 0;
+    DA[tmp] = uint40_from_u64(tmp-1);
+
+    succ_t = 0; // s[n-2] must be L-type.
+    for(i=n-2; i>0; i--) {
+        cur_t = (chr(uint40_to_u64(i)-1) < chr(uint40_to_u64(i)) ||
+                (chr(uint40_to_u64(i)-1) == chr(uint40_to_u64(i)) && succ_t==1)
+               ) ? 1 : 0;
+        if(cur_t==0 && succ_t==1) {
+            if(chr(uint40_to_u64(i)) != separator) {
+                SA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+                LCP[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = 0;
+                DA[uint40_to_u64(bkt[chr(uint40_to_u64(i))])] = uint40_from_u64(i);
+                bkt[chr(uint40_to_u64(i))] = uint40_dec(bkt[chr(uint40_to_u64(i)))]);
+            }
+        }
+        succ_t = cur_t;
+    }
+}
+
+int SACA_K(int_t *s, uint_t *SA, uint64_t n, unsigned int K, uint64_t m, int cs, int level) {
+    uint_t *bkt = NULL;
+    int_t *RA = NULL;
+    uint64_t i;
+    uint64_t n1;
+    int name;
+    int err = 0;
+
+    // stage 1: reduce the problem by at least 1/2.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    putSubstr0(SA, s, bkt, n, K, cs);
+    induceSAl0(SA, s, bkt, n, K, false, cs);
+    induceSAs0(SA, s, bkt, n, K, false, cs);
+
+    // now, all the LMS-substrings are sorted and stored in SA[].
+    // compact all the sorted substrings into the first n1 items of SA.
+    // 2*n1 must be not larger than n.
+    n1 = 0;
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            uint_t j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(!chr(uint40_to_u64(j)) && (chr(uint40_to_u64(j)) < chr(uint40_to_u64(j)+1)))) {
+                SA[n1] = j;
+                n1++;
+            }
+        }
+    }
+
+    // Init the name array buffer.
+    for(i=n1; i<n; i++) SA[i] = uint40_from_u64(0);
+
+    // find the lexicographic names of all LMS-substrings.
+    name = getLengthOfSubstr(SA, s, n, K, cs, n1, level);
+
+    if(name < n1) {
+        // if names are not yet unique, need to recurse.
+        RA = (int_t *)malloc(sizeof(int_t)*n1);
+        if(RA == NULL) { err = -2; goto error; }
+        for(i=0; i<n1; i++) RA[i] = chr(uint40_to_u64(SA[i]));
+        free(bkt);
+        err = SACA_K(RA, SA, n1, name+1, n1, sizeof(int_t), level+1);
+        if(err != 0) goto error;
+
+        for(i=0; i<n1; i++) SA[i] = uint40_from_u64(SA[i]);
+    }
+    free(bkt);
+
+    // stage 3: induce the result for the original problem.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    if(bkt == NULL) { err = -2; goto error; }
+    // put all left-most S characters into their buckets
+    putSuffix0(SA, s, bkt, n, K, n1, cs);
+    // compute SAl
+    induceSAl0(SA, s, bkt, n, K, true, cs);
+    // compute SAs
+    induceSAs0(SA, s, bkt, n, K, true, cs);
+
+error:
+    free(bkt);
+    free(RA);
+
+    return err;
+}
+
+int SACA_K_LCP(int_t *s, uint_t *SA, int_t *LCP, uint64_t n, unsigned int K, int cs, int level) {
+    uint_t *bkt = NULL;
+    int_t *RA = NULL;
+    uint64_t i;
+    uint64_t n1;
+    int name;
+    int err = 0;
+
+    // stage 1: reduce the problem by at least 1/2.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    putSubstr0(SA, s, bkt, n, K, cs);
+    induceSAl0(SA, s, bkt, n, K, false, cs);
+    induceSAs0(SA, s, bkt, n, K, false, cs);
+
+    // now, all the LMS-substrings are sorted and stored in SA[].
+    // compact all the sorted substrings into the first n1 items of SA.
+    // 2*n1 must be not larger than n.
+    n1 = 0;
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            uint_t j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(!chr(uint40_to_u64(j)) && (chr(uint40_to_u64(j)) < chr(uint40_to_u64(j)+1)))) {
+                SA[n1] = j;
+                n1++;
+            }
+        }
+    }
+
+    // Init the name array buffer.
+    for(i=n1; i<n; i++) SA[i] = uint40_from_u64(0);
+
+    // find the lexicographic names of all LMS-substrings.
+    name = getLengthOfSubstr(SA, s, n, K, cs, n1, level);
+
+    if(name < n1) {
+        // if names are not yet unique, need to recurse.
+        RA = (int_t *)malloc(sizeof(int_t)*n1);
+        if(RA == NULL) { err = -2; goto error; }
+        for(i=0; i<n1; i++) RA[i] = chr(uint40_to_u64(SA[i]));
+        free(bkt);
+        err = SACA_K(RA, SA, n1, name+1, n1, sizeof(int_t), level+1);
+        if(err != 0) goto error;
+
+        for(i=0; i<n1; i++) SA[i] = uint40_from_u64(SA[i]);
+    }
+    free(bkt);
+
+    // stage 3: induce the result for the original problem.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    if(bkt == NULL) { err = -2; goto error; }
+    // put all left-most S characters into their buckets
+    putSuffix0(SA, s, bkt, n, K, n1, cs);
+    // compute SAl
+    induceSAl0_LCP(SA, LCP, s, bkt, n, K, cs);
+    // compute SAs
+    induceSAs0_LCP(SA, LCP, s, bkt, n, K, cs);
+
+error:
+    free(bkt);
+    free(RA);
+
+    return err;
+}
+
+int SACA_K_DA(int_t *s, uint_t *SA, int_da *DA, uint64_t n, unsigned int K, int cs, int level) {
+    uint_t *bkt = NULL;
+    int_t *RA = NULL;
+    uint64_t i;
+    uint64_t n1;
+    int name;
+    int err = 0;
+
+    // stage 1: reduce the problem by at least 1/2.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    putSubstr0(SA, s, bkt, n, K, cs);
+    induceSAl0(SA, s, bkt, n, K, false, cs);
+    induceSAs0(SA, s, bkt, n, K, false, cs);
+
+    // now, all the LMS-substrings are sorted and stored in SA[].
+    // compact all the sorted substrings into the first n1 items of SA.
+    // 2*n1 must be not larger than n.
+    n1 = 0;
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            uint_t j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(!chr(uint40_to_u64(j)) && (chr(uint40_to_u64(j)) < chr(uint40_to_u64(j)+1)))) {
+                SA[n1] = j;
+                n1++;
+            }
+        }
+    }
+
+    // Init the name array buffer.
+    for(i=n1; i<n; i++) SA[i] = uint40_from_u64(0);
+
+    // find the lexicographic names of all LMS-substrings.
+    name = getLengthOfSubstr(SA, s, n, K, cs, n1, level);
+
+    if(name < n1) {
+        // if names are not yet unique, need to recurse.
+        RA = (int_t *)malloc(sizeof(int_t)*n1);
+        if(RA == NULL) { err = -2; goto error; }
+        for(i=0; i<n1; i++) RA[i] = chr(uint40_to_u64(SA[i]));
+        free(bkt);
+        err = SACA_K(RA, SA, n1, name+1, n1, sizeof(int_t), level+1);
+        if(err != 0) goto error;
+
+        for(i=0; i<n1; i++) SA[i] = uint40_from_u64(SA[i]);
+    }
+    free(bkt);
+
+    // stage 3: induce the result for the original problem.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    if(bkt == NULL) { err = -2; goto error; }
+    // put all left-most S characters into their buckets
+    putSuffix0(SA, s, bkt, n, K, n1, cs);
+    // compute SAl
+    induceSAl0_DA(SA, DA, s, bkt, n, K, cs);
+    // compute SAs
+    induceSAs0_DA(SA, DA, s, bkt, n, K, cs);
+
+error:
+    free(bkt);
+    free(RA);
+
+    return err;
+}
+
+int SACA_K_LCP_DA(int_t *s, uint_t *SA, int_t *LCP, int_da *DA, uint64_t n, unsigned int K, int cs, int level) {
+    uint_t *bkt = NULL;
+    int_t *RA = NULL;
+    uint64_t i;
+    uint64_t n1;
+    int name;
+    int err = 0;
+
+    // stage 1: reduce the problem by at least 1/2.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    putSubstr0(SA, s, bkt, n, K, cs);
+    induceSAl0(SA, s, bkt, n, K, false, cs);
+    induceSAs0(SA, s, bkt, n, K, false, cs);
+
+    // now, all the LMS-substrings are sorted and stored in SA[].
+    // compact all the sorted substrings into the first n1 items of SA.
+    // 2*n1 must be not larger than n.
+    n1 = 0;
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            uint_t j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(!chr(uint40_to_u64(j)) && (chr(uint40_to_u64(j)) < chr(uint40_to_u64(j)+1)))) {
+                SA[n1] = j;
+                n1++;
+            }
+        }
+    }
+
+    // Init the name array buffer.
+    for(i=n1; i<n; i++) SA[i] = uint40_from_u64(0);
+
+    // find the lexicographic names of all LMS-substrings.
+    name = getLengthOfSubstr(SA, s, n, K, cs, n1, level);
+
+    if(name < n1) {
+        // if names are not yet unique, need to recurse.
+        RA = (int_t *)malloc(sizeof(int_t)*n1);
+        if(RA == NULL) { err = -2; goto error; }
+        for(i=0; i<n1; i++) RA[i] = chr(uint40_to_u64(SA[i]));
+        free(bkt);
+        err = SACA_K(RA, SA, n1, name+1, n1, sizeof(int_t), level+1);
+        if(err != 0) goto error;
+
+        for(i=0; i<n1; i++) SA[i] = uint40_from_u64(SA[i]);
+    }
+    free(bkt);
+
+    // stage 3: induce the result for the original problem.
+    bkt = (uint_t *)malloc(sizeof(uint_t)*K);
+    if(bkt == NULL) { err = -2; goto error; }
+    // put all left-most S characters into their buckets
+    putSuffix0(SA, s, bkt, n, K, n1, cs);
+    // compute SAl
+    induceSAl0_LCP_DA(SA, LCP, DA, s, bkt, n, K, cs);
+    // compute SAs
+    induceSAs0_LCP_DA(SA, LCP, DA, s, bkt, n, K, cs);
+
+error:
+    free(bkt);
+    free(RA);
+
+    return err;
+}
+
+
+/*****************************************************************************/
+
+int getLengthOfSubstr(uint_t *SA, int_t *s, uint64_t n, unsigned int K, int cs, uint64_t n1, int level) {
+    uint64_t i, j, p, q;
+    int name;
+    int c0, c1;
+    uint_t *s1;
+    uint_t *bkt;
+
+    if(level > 0) s1 = (uint_t*)s;
+    else s1 = (uint_t*)malloc(sizeof(uint_t)*n1);
+
+    name = 0;
+    c0 = chr(uint40_to_u64(SA[0]));
+    for(i=1; i<n1; i++) {
+        p = SA[i-1]; q = SA[i];
+        c1 = chr(uint40_to_u64(q));
+        if(c0 != c1) {
+            name++;
+            c0 = c1;
+            continue;
+        }
+        for(j=1; j<n; j++) {
+            if(chr(uint40_to_u64(p)+j) != chr(uint40_to_u64(q)+j)) break;
+        }
+        if(j == n || chr(uint40_to_u64(p)+j) != chr(uint40_to_u64(q)+j)) {
+            name++;
+        }
+        c0 = c1;
+    }
+
+    if(level == 0) {
+        if(name < n1) {
+            for(i=0; i<n1; i++) s1[i] = chr(uint40_to_u64(SA[i]));
+        }
+        free(s1);
+    }
+
+    return name;
+}
+
+void induceSAl0_generalized_DA(uint_t *SA, int_da *DA, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    // find the head of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, false, cs);
+
+    bkt[0] = uint40_inc(bkt[0]); // skip the virtual sentinel.
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) >= chr(uint40_to_u64(j)+1)) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                    DA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = DA[i];
+                    bkt[chr(uint40_to_u64(j))] = uint40_inc(bkt[chr(uint40_to_u64(j))]);
+                }
+            }
+        }
+    }
+}
+
+void induceSAs0_generalized_DA(uint_t *SA, int_da *DA, uint_t *s, uint_t *bkt, uint_t n, uint_t K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    for(i=n-1; i>0; i--) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) <= chr(uint40_to_u64(j)+1) && uint40_to_u64(bkt[chr(uint40_to_u64(j))]) < i) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                    DA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = DA[i];
+                    bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]);
+                }
+            }
+        }
+    }
+}
+
+void induceSAl0_generalized_LCP_DA(uint_t *SA, int_t *LCP, int_da *DA, uint_t *s, uint_t *bkt, uint_t n, unsigned int K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    for(i=0; i<K; i++)
+        if(uint40_to_u64(bkt[i])+1 < n) 
+            if(uint40_to_u64(SA[uint40_to_u64(bkt[i])+1]) != U_MAX) 
+                LCP[uint40_to_u64(bkt[i])+1] = I_MIN;
+
+    // find the head of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, false, cs);
+
+    for(i=0; i<K; i++)
+        if(uint40_to_u64(bkt[i]) < n) 
+            LCP[uint40_to_u64(bkt[i])] = -2;
+
+    #if RMQ_L == 1 
+    int_t *M = (int_t *)malloc(sizeof(int_t)*K);
+    for(i=0; i<K; i++) {
+        M[i] = I_MAX;
+    }
+    #elif RMQ_L == 2
+    uint_t* last_occ = (uint_t*)malloc(K*sizeof(uint_t));
+    uint_t* tmp = (uint_t*)malloc(K*sizeof(uint_t));
+
+    t_pair_k* STACK = (t_pair_k*)malloc((STACK_SIZE_L+2)*sizeof(t_pair_k));
+    int_t top = 0;
+    stack_push_k(STACK, &top, 0, -1);//init
+    for(i=0; i<K; i++) last_occ[i] = uint40_from_u64(0);
+    #endif 
+
+    bkt[0] = uint40_inc(bkt[0]); // skip the virtual sentinel.
+    for(i=0; i<n; i++) {
+        if(uint40_to_u64(SA[i]) != U_MAX) {
+            if(LCP[i] == I_MIN) { //is a L/S-seam position
+                int_t l = 0;
+                if(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(SA[i]))]-1)]) < n-1)	
+                    while(chr(uint40_to_u64(SA[i])+l) == chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(SA[i]))]-1)])+l)) ++l;
+                LCP[i] = l;
+            }
+
+            #if RMQ_L == 1
+            uint_t k;
+            for(k=0; k<K; k++) 
+                if(M[k] > LCP[i]) 
+                    M[k] = maxval(0,LCP[i]);
+            #elif RMQ_L == 2
+            int_t min_lcp = 0;
+            uint_t last;
+
+            if(!uint40_to_u64(SA[i])) last = uint40_from_u64(0);
+            else {
+                last = last_occ[chr(uint40_to_u64(SA[i])-1)];
+                last_occ[chr(uint40_to_u64(SA[i])-1)] = uint40_from_u64(i+1);
+            }
+
+            int_t lcp = maxval(0,LCP[i]);
+            while(STACK[top-1].lcp >= lcp) top--;	
+
+            stack_push_k(STACK, &top, i+1, lcp);
+            j = top-1;
+
+            while(uint40_to_u64(STACK[j].idx) > uint40_to_u64(last)) j--;
+            min_lcp = STACK[j+1].lcp;
+            #endif
+
+            if(uint40_to_u64(SA[i]) > 0) {
+                j = uint40_dec(SA[i]); // j=SA[i]-1
+                if(chr(uint40_to_u64(j)) >= chr(uint40_to_u64(j)+1)) {
+                    if(chr(uint40_to_u64(j)) != separator) {
+                        SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                        DA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = DA[i];
+                        #if RMQ_L == 1
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] += M[chr(uint40_to_u64(j))] + 1;
+                        M[chr(uint40_to_u64(j))] = I_MAX;
+                        #elif RMQ_L == 2
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] += min_lcp + 1;
+                        #endif
+                        bkt[chr(uint40_to_u64(j))] = uint40_inc(bkt[chr(uint40_to_u64(j))]);
+                    }
+                }
+            }
+
+            #if RMQ_L == 2
+            if(top > STACK_SIZE_L) {//if stack is full
+                int_t j;
+                memcpy(tmp, last_occ, K*sizeof(uint_t));
+                qsort(tmp, K, sizeof(uint_t), compare_k);
+
+                int_t curr = 1, end = 1;
+                STACK[top].idx = uint40_from_u64(U_MAX);
+                for(j=0; j<K; j++) {
+                    if(uint40_to_u64(STACK[end-1].idx) < uint40_to_u64(tmp[j])+1) {
+                        while(uint40_to_u64(STACK[curr].idx) < uint40_to_u64(tmp[j])+1) curr++;
+                        if(curr < top) {
+                            stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
+                            curr++;
+                        }
+                    }
+                }
+
+                if(end >= STACK_SIZE_L) {
+                    fprintf(stderr,"ERROR: induceSAl0_LCP\n");
+                    exit(1);
+                }
+                top = end;
+            }
+            #endif
+        }
+    }
+
+    #if RMQ_L == 1
+    free(M);
+    #elif RMQ_L == 2
+    free(STACK);
+    free(last_occ);
+    free(tmp);
+    #endif
+}
+
+void induceSAs0_generalized_LCP_DA(uint_t *SA, int_t *LCP, int_da *DA, uint_t *s, uint_t *bkt, uint_t n, uint_t K, int cs, uint_t separator) {
+    uint_t i, j;
+
+    // find the end of each bucket.
+    getBuckets_k((int_t*)s, bkt, n, K, true, cs);
+
+    #if RMQ_S == 1
+    int_t *M = (int_t *)malloc(sizeof(int_t)*K);
+    for(i=0; i<K; i++) M[i] = I_MAX;
+    #elif RMQ_S == 2
+    uint_t* last_occ = (uint_t*)malloc(K*sizeof(uint_t));
+    uint_t* tmp = (uint_t*)malloc(K*sizeof(uint_t));
+
+    t_pair_k* STACK = (t_pair_k*)malloc((STACK_SIZE_S+2)*sizeof(t_pair_k));
+    int_t top = 0;
+    stack_push_k(STACK, &top, n, -1);//init
+    for(i=0; i<K; i++) last_occ[i] = uint40_from_u64(n-1);
+    #endif
+
+    for(i=n-1; i>0; i--) {
+        if(uint40_to_u64(SA[i]) > 0) {
+            j = uint40_dec(SA[i]); // j=SA[i]-1
+            if(chr(uint40_to_u64(j)) <= chr(uint40_to_u64(j)+1) && uint40_to_u64(bkt[chr(uint40_to_u64(j))]) < i) {
+                if(chr(uint40_to_u64(j)) != separator) {
+                    SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = j;
+                    DA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = DA[i];
+
+                    #if RMQ_S == 1
+                    if(LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] >= 0)
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] = M[chr(uint40_to_u64(j))] + 1;
+
+                    if(LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] > 0)
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])] = I_MAX;
+                    #elif RMQ_S == 2
+                    int_t min = I_MAX, end = top-1;
+
+                    int_t last = uint40_to_u64(last_occ[chr(uint40_to_u64(j))]);
+                    while(uint40_to_u64(STACK[end].idx) <= last) end--;
+
+                    min = STACK[end+1].lcp;
+                    last_occ[chr(uint40_to_u64(j))] = uint40_from_u64(i);
+
+                    if(LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] >= 0)
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] = min + 1;
+                    #endif
+
+                    #if RMQ_S == 1
+                    M[chr(uint40_to_u64(j))] = I_MAX;
+                    #endif
+
+                    bkt[chr(uint40_to_u64(j))] = uint40_dec(bkt[chr(uint40_to_u64(j))]);
+
+                    if(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])]) != U_MAX) {//L/S-seam
+                        int_t l = 0;
+                        while(chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1])+l) == chr(uint40_to_u64(SA[uint40_to_u64(bkt[chr(uint40_to_u64(j))])]+l))) ++l;
+                        LCP[uint40_to_u64(bkt[chr(uint40_to_u64(j))])+1] = l;
+                    }
+                }
+            }
+        }
+
+        if(LCP[i] < 0) LCP[i] = 0;
+
+        #if RMQ_S == 1
+        int_t k;
+        for(k=0; k<K; k++)
+            if(M[k] > LCP[i])
+                M[k] = LCP[i];
+        #elif RMQ_S == 2
+        int_t lcp = maxval(0,LCP[i]);
+        while(STACK[top-1].lcp >= lcp) top--;
+        stack_push_k(STACK, &top, i, lcp);
+
+        if(top >= STACK_SIZE_S) {
+            int_t j;
+            memcpy(tmp, last_occ, K*sizeof(uint_t));
+            qsort(tmp, K, sizeof(uint_t), compare_k);
+
+            int_t curr = 1, end = 1;
+            for(j=K-1; j>=0; j--) {
+                if(uint40_to_u64(tmp[j]) < uint40_to_u64(STACK[end-1].idx)) {
+                    while(uint40_to_u64(STACK[curr].idx) > uint40_to_u64(tmp[j]) && curr < top) curr++;
+                    if(curr >= top) break;
+                    stack_push_k(STACK, &end, STACK[curr].idx, STACK[curr].lcp);
+                    curr++;
+                }
+            }
+
+            if(end >= STACK_SIZE_S) {
+                fprintf(stderr,"ERROR: induceSAl0_LCP\n");
+                exit(1);
+            }
+            top = end;
+        }
+        #endif
+    }
+
+    LCP[0] = 0;
+
+    #if RMQ_S == 1
+    free(M);
+    #elif RMQ_S == 2
+    free(STACK);
+    free(last_occ);
+    free(tmp);
+    #endif
+}
